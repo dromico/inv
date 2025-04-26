@@ -320,6 +320,7 @@ Create a web application for a MainContractor to manage subcontractor work submi
 
 ### Next.js Version & Configuration
 - Install Next.js 15 specifically (not any other version)
+- Install Next.js in the current folder, do not create a new project folder
 - Configure app router properly with modern patterns
 - Set up proper middleware for authentication flow
 
