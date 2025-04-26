@@ -54,6 +54,7 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - **Invoice Management**: Generate and download invoices for any job
 - **Subcontractor Management**: View list of all subcontractors
 - **Notifications**: Send notifications to subcontractors
+- **Bulk Actions**: Ability to select multiple jobs for simultaneous status updates or invoice generation
 
 ### Invoicing System
 
@@ -63,6 +64,7 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - Include company branding
 - Downloadable format
 - Stored in database for future reference
+- All monetary values must be displayed in Malaysian Ringgit (RM)
 
 ### Notification System
 
@@ -105,8 +107,8 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - start_date
 - end_date
 - unit (quantity)
-- unit_price
-- total (calculated: unit * unit_price)
+- unit_price (in Malaysian Ringgit - RM)
+- total (calculated: unit * unit_price, in Malaysian Ringgit - RM)
 - status (pending, in-progress, completed)
 - notes
 - created_at
@@ -149,6 +151,32 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - Calendar view option for job dates
 - Subcontractor management section
 - Invoice generation and download functionality
+
+### UX Enhancements
+- **Mobile Optimization**:
+  - Implement mobile-first design principles
+  - Ensure full functionality on smartphones for subcontractors working in the field
+  - Optimize touch targets and form inputs for mobile use
+- **Dashboard Organization**:
+  - Display key metrics prominently (total active jobs, pending payments)
+  - Show recently updated items at the top
+  - Provide quick-action buttons for common tasks
+- **Form Experience**:
+  - Implement multi-step forms for complex submissions to reduce cognitive load
+  - Add autosave functionality to prevent data loss
+  - Provide contextual help and tooltips
+- **Search & Filtering**:
+  - Advanced search capabilities across jobs, dates, and subcontractors
+  - Quick filters for common needs (e.g., "Completed this month", "Pending payment")
+  - Save custom filter presets
+- **User Onboarding**:
+  - First-time user experience with guided tooltips
+  - Well-designed empty states for new users with no data
+  - Contextual help throughout the application
+- **Error States**:
+  - Clear error messaging and recovery options
+  - Offline mode capabilities for poor connectivity situations
+  - Form field validation with helpful error messages
 
 ## Security Requirements
 
@@ -220,6 +248,14 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - Row-level security policies
 - Realtime functionality for notifications
 
+### Performance Considerations
+- Implement pagination for job listings to handle large datasets efficiently
+- Optimize PDF generation to handle concurrent requests
+- Use server-side caching for frequently accessed data
+- Implement lazy loading for images and large content
+- Consider incremental static regeneration for dashboard pages
+- Use proper indexing on database tables for query performance
+
 ## Future Considerations
 - Email notifications
 - Advanced reporting features
@@ -270,6 +306,13 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - Supabase project creation
 - Next.js project initialization
 - Environment variables configuration
+  - Create `.env.local` file with placeholders for Supabase credentials:
+    ```
+    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+    ```
+  - Later, replace placeholders with actual Supabase tokens after project creation
 - User roles and permissions setup
 - Initial admin account creation
 
@@ -316,6 +359,7 @@ Create a web application for a MainContractor to manage subcontractor work submi
 - Add modern UI touches like skeletons during loading states
 - Ensure all forms have proper validation with clear error messages
 - Add confirmation dialogs for destructive actions
+- Display all monetary values in Malaysian Ringgit (RM) format
 
 ## Development Guidelines
 
