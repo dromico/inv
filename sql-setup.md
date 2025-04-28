@@ -15,6 +15,7 @@ CREATE TABLE profiles (
   contact_person TEXT,
   phone_number TEXT,
   address TEXT,
+  role TEXT DEFAULT 'subcontractor' NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
@@ -59,6 +60,16 @@ CREATE TABLE notifications (
   related_entity_type notification_entity_type,
   related_entity_id UUID,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- Create files table (optional)
+CREATE TABLE files (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  job_id UUID REFERENCES jobs(id) ON DELETE CASCADE NOT NULL,
+  file_name TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  uploaded_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Function to handle user creation
@@ -111,8 +122,8 @@ BEGIN
     RETURN NEW;
   END IF;
   
-  -- Find an admin user (assuming admins are marked in user_metadata)
-  SELECT id INTO admin_id FROM auth.users WHERE raw_user_meta_data->>'role' = 'admin' LIMIT 1;
+  -- Find an admin user from profiles table
+  SELECT id INTO admin_id FROM profiles WHERE role = 'admin' LIMIT 1;
   
   -- Create notification for subcontractor
   IF NEW.status = 'in-progress' THEN
@@ -181,6 +192,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
 CREATE POLICY "Users can view their own profile"
@@ -194,7 +206,13 @@ CREATE POLICY "Users can update their own profile"
 CREATE POLICY "Admins can view all profiles"
   ON profiles FOR SELECT
   USING (
-    (SELECT raw_user_meta_data->>'role' FROM auth.users WHERE id = auth.uid()) = 'admin'
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+CREATE POLICY "Admins can update all profiles"
+  ON profiles FOR UPDATE
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   );
 
 -- Jobs policies
@@ -210,16 +228,26 @@ CREATE POLICY "Subcontractors can update their pending jobs"
   ON jobs FOR UPDATE
   USING (auth.uid() = subcontractor_id AND status = 'pending');
 
+CREATE POLICY "Subcontractors can delete their pending jobs"
+  ON jobs FOR DELETE
+  USING (auth.uid() = subcontractor_id AND status = 'pending');
+
 CREATE POLICY "Admins can view all jobs"
   ON jobs FOR SELECT
   USING (
-    (SELECT raw_user_meta_data->>'role' FROM auth.users WHERE id = auth.uid()) = 'admin'
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   );
 
 CREATE POLICY "Admins can update any job"
   ON jobs FOR UPDATE
   USING (
-    (SELECT raw_user_meta_data->>'role' FROM auth.users WHERE id = auth.uid()) = 'admin'
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+CREATE POLICY "Admins can delete any job"
+  ON jobs FOR DELETE
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   );
 
 -- Invoices policies
@@ -232,7 +260,7 @@ CREATE POLICY "Subcontractors can view their own invoices"
 CREATE POLICY "Admins can manage all invoices"
   ON invoices FOR ALL
   USING (
-    (SELECT raw_user_meta_data->>'role' FROM auth.users WHERE id = auth.uid()) = 'admin'
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   );
 
 -- Notifications policies
@@ -247,25 +275,45 @@ CREATE POLICY "Users can update their own notifications"
 CREATE POLICY "Admins can insert notifications"
   ON notifications FOR INSERT
   WITH CHECK (
-    (SELECT raw_user_meta_data->>'role' FROM auth.users WHERE id = auth.uid()) = 'admin'
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   );
 
--- Create an admin user (Change the email and password as needed)
--- INSERT INTO auth.users (email, password, raw_user_meta_data)
--- VALUES ('admin@example.com', 'securepassword', '{"role":"admin"}');
+CREATE POLICY "Admins can view all notifications"
+  ON notifications FOR SELECT
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
 
--- Demo data for testing (uncomment to use)
-/*
--- Insert some profiles
-INSERT INTO profiles (id, company_name, contact_person, phone_number, address)
-VALUES 
-  ('00000000-0000-0000-0000-000000000001', 'ABC Contractors', 'John Doe', '6012-3456789', '123 Main St, Kuala Lumpur'),
-  ('00000000-0000-0000-0000-000000000002', 'XYZ Plumbing', 'Jane Smith', '6019-8765432', '456 First Ave, Petaling Jaya');
+-- Files policies
+CREATE POLICY "Subcontractors can view files for their own jobs"
+  ON files FOR SELECT
+  USING (
+    auth.uid() IN (SELECT subcontractor_id FROM jobs WHERE id = files.job_id)
+  );
 
--- Insert some jobs
-INSERT INTO jobs (subcontractor_id, job_type, location, start_date, end_date, status, unit, unit_price, notes)
-VALUES
-  ('00000000-0000-0000-0000-000000000001', 'Electrical Work', 'Office Building A', '2023-01-15', '2023-01-20', 'completed', 40, 100, 'Full rewiring job'),
-  ('00000000-0000-0000-0000-000000000001', 'Plumbing Repair', 'Residence 123', '2023-02-01', '2023-02-03', 'in-progress', 12, 75, 'Fix bathroom leaks'),
-  ('00000000-0000-0000-0000-000000000002', 'HVAC Installation', 'Commercial Complex', '2023-02-10', '2023-02-15', 'pending', 25, 150, 'Install new AC units');
-*/
+CREATE POLICY "Subcontractors can insert files for their own jobs"
+  ON files FOR INSERT
+  WITH CHECK (
+    auth.uid() IN (SELECT subcontractor_id FROM jobs WHERE id = files.job_id)
+  );
+
+CREATE POLICY "Subcontractors can delete files for their own jobs"
+  ON files FOR DELETE
+  USING (
+    auth.uid() IN (SELECT subcontractor_id FROM jobs WHERE id = files.job_id)
+  );
+
+CREATE POLICY "Admins can manage all files"
+  ON files FOR ALL
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- Note: Admin user creation should be done by updating the profiles table
+-- To create an admin user in Supabase:
+-- 1. Go to Authentication > Users in the Supabase dashboard
+-- 2. Click "Add User" and create a user with email and password
+-- 3. Then run the following SQL to set the user as admin:
+--    UPDATE profiles
+--    SET role = 'admin'
+--    WHERE id = (SELECT id FROM auth.users WHERE email = 'your-admin-email@example.com');

@@ -27,6 +27,7 @@ export function UserNav() {
       contact_person?: string;
       phone_number?: string;
       address?: string;
+      role?: string;
       [key: string]: unknown;
     };
   };
@@ -82,17 +83,19 @@ export function UserNav() {
       setIsLoading(false)
     }
   }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 hover:bg-accent p-2 rounded-md">
           <span className="hidden md:inline-block">
-            {user?.profile?.company_name || user?.email || "User"}
+            {user?.profile?.contact_person || user?.profile?.company_name || user?.email || "User"}
           </span>
           <Avatar className="h-8 w-8">
             <AvatarFallback>
-              {user?.profile?.company_name?.charAt(0) || user?.email?.charAt(0) || "U"}
+              {user?.profile?.contact_person?.charAt(0) ||
+                user?.profile?.company_name?.charAt(0) ||
+                user?.email?.charAt(0) ||
+                "U"}
             </AvatarFallback>
           </Avatar>
         </button>
@@ -101,11 +104,18 @@ export function UserNav() {
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {user?.profile?.company_name || "User"}
+              {user?.profile?.contact_person || user?.profile?.company_name || "User"}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
               {user?.email}
             </p>
+            {user?.profile?.role && (
+              <p className="text-xs leading-none text-muted-foreground mt-1">
+                Role: {typeof user.profile.role === 'string'
+                  ? user.profile.role.charAt(0).toUpperCase() + user.profile.role.slice(1)
+                  : String(user.profile.role)}
+              </p>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

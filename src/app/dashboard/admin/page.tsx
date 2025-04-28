@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowRightIcon, BarChart4, CircleDollarSign, ListTodo, Users } from "lucide-react"
+import { ArrowRightIcon, BarChart4, CircleDollarSign, ListTodo, Settings, Users, Database } from "lucide-react"
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -80,14 +80,28 @@ export default function AdminDashboardPage() {
     
     fetchDashboardData()
   }, [supabase, toast])
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">
-          Welcome to your admin dashboard.
-        </p>
+    <div className="space-y-6">      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">
+            Welcome to your admin dashboard.
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/db-tools">
+              <Database className="h-4 w-4 mr-2" />
+              DB Tools
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin-tools">
+              <Settings className="h-4 w-4 mr-2" />
+              Admin Tools
+            </Link>
+          </Button>
+        </div>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

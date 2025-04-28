@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { AdminInitializer } from "@/components/admin-initializer";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -39,6 +40,8 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          {/* Component that ensures romico@gmail.com has admin role */}
+          {process.env.NODE_ENV !== 'development' && <AdminInitializer />}
         </ThemeProvider>
       </body>
     </html>

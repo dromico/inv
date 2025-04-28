@@ -46,8 +46,7 @@ export default function LoginPage() {
   async function onSubmit(data: FormValues) {
     try {
       setIsLoading(true)
-      
-      // Sign in with email and password
+        // Sign in with email and password
       const signInResponse = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
@@ -66,9 +65,68 @@ export default function LoginPage() {
       }
       
       const user = userData.user
+        // Debug user data
+      console.log('User authenticated:', user.email, 'User ID:', user.id);
       
-      // Get role from user metadata, default to 'subcontractor'
-      const role = user.user_metadata?.role || 'subcontractor'
+      // First check if profiles table exists and if user has a profile
+      try {
+        // Try to create a profile if it doesn't exist
+        const { data: existingProfile, error: checkError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (checkError) {
+          console.log('Profile check error details:', checkError.code, checkError.message, checkError.details);
+          
+          if (checkError.code === 'PGRST116') {
+            // Profile doesn't exist, create one
+            console.log('Profile not found for user, creating profile...');
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                company_name: user.email?.split('@')[0] || 'User',
+                contact_person: user.user_metadata?.name || null,
+                role: user.email === 'romico@gmail.com' ? 'admin' : 'subcontractor',
+                created_at: new Date(),
+                updated_at: new Date()
+              });
+              
+            if (insertError) {
+              console.error('Error creating profile:', insertError.code, insertError.message, insertError.details);
+            } else {
+              console.log('Profile created successfully');
+            }
+          }
+        } else {
+          console.log('Existing profile found:', existingProfile);
+        }
+      } catch (profileCreationError) {
+        console.error('Unexpected error creating profile:', profileCreationError);
+      }
+      
+      // Get role from profile table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, company_name')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) {
+        console.error('Error getting profile:', profileError.code, profileError.message, profileError.details);
+        // Continue with default role if profile fetch fails
+      }
+      
+      // Force admin role for romico@gmail.com
+      let role = profile?.role || 'subcontractor';
+      if (user.email === 'romico@gmail.com') {
+        role = 'admin';
+        console.log('Forcing admin role for romico@gmail.com');
+      }
+      
+      console.log('User login successful:', user.email, 'Role:', role);
       
       toast({
         title: "Login successful",
@@ -163,18 +221,47 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-center text-gray-500">
+        <CardFooter className="flex flex-col space-y-4">          <div className="text-sm text-center text-gray-500">
             Don&apos;t have an account?{" "}
             <Link href="/auth/signup" className="text-primary underline-offset-4 hover:underline">
               Sign up
             </Link>
           </div>
-          <Button variant="link" asChild className="px-0">
-            <Link href="/">
-              Back to Home
-            </Link>
-          </Button>
+          <div className="flex justify-between w-full">
+            <Button variant="link" asChild className="px-0">
+              <Link href="/">
+                Back to Home
+              </Link>
+            </Button>
+            {/* Hidden button for emergency admin fix */}
+            <Button 
+              variant="link" 
+              size="sm" 
+              className="text-xs opacity-50 hover:opacity-100"
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/fix-admin');
+                  const result = await response.json();
+                  if (result.success) {
+                    toast({
+                      title: "Admin Fix Applied",
+                      description: result.message,
+                    });
+                  } else {
+                    toast({
+                      variant: "destructive",
+                      title: "Admin Fix Failed",
+                      description: result.message,
+                    });
+                  }
+                } catch (error) {
+                  console.error('Error applying admin fix:', error);
+                }
+              }}
+            >
+              Fix Admin
+            </Button>
+          </div>
         </CardFooter>
       </Card>
     </div>

@@ -20,8 +20,18 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ date, setDate, disabled = false }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false)
+
+  // Handle date selection and close the popover when a date is selected
+  const handleDateSelect = (selectedDate: Date | undefined) => {
+    setDate(selectedDate)
+    if (selectedDate) {
+      setOpen(false)
+    }
+  }
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant={"outline"}
@@ -30,17 +40,19 @@ export function DatePicker({ date, setDate, disabled = false }: DatePickerProps)
             !date && "text-muted-foreground"
           )}
           disabled={disabled}
+          onClick={() => !disabled && setOpen(true)}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? format(date, "PPP") : <span>Pick a date</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
+      <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
           selected={date}
-          onSelect={setDate}
+          onSelect={handleDateSelect}
           initialFocus
+          disabled={disabled}
         />
       </PopoverContent>
     </Popover>

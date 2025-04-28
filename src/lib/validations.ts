@@ -23,9 +23,15 @@ export const signupSchema = z.object({
   path: ["confirmPassword"]
 });
 
+// Line item schema
+export const lineItemSchema = z.object({
+  item_name: z.string().min(2, { message: "Item name is required" }),
+  unit_quantity: z.number().positive({ message: "Quantity must be a positive number" }),
+  unit_price: z.number().nonnegative({ message: "Price must be a non-negative number" }),
+});
+
 // Job creation/editing schema
 export const jobSchema = z.object({
-  job_type: z.string().min(2, { message: "Job type is required" }),
   location: z.string().min(2, { message: "Location is required" }),
   start_date: z.date({
     required_error: "Start date is required",
@@ -35,8 +41,7 @@ export const jobSchema = z.object({
     required_error: "End date is required",
     invalid_type_error: "End date must be a valid date",
   }),
-  unit: z.number().positive({ message: "Unit must be a positive number" }),
-  unit_price: z.number().nonnegative({ message: "Price must be a non-negative number" }),
+  line_items: z.array(lineItemSchema).min(1, { message: "At least one line item is required" }),
   notes: z.string().optional(),
 }).refine(data => data.end_date >= data.start_date, {
   message: "End date must be after or equal to the start date",

@@ -4,6 +4,7 @@ export interface Profile {
   contact_person: string | null;
   phone_number: string | null;
   address: string | null;
+  role: 'admin' | 'subcontractor';
   created_at: string;
   updated_at: string;
 }
