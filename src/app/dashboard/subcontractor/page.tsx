@@ -26,6 +26,8 @@ export default function SubcontractorDashboard() {
     async function loadDashboardData() {
       try {
         setLoading(true)
+        // Removed userId variable initialization
+        let userId = null;
         
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -36,57 +38,59 @@ export default function SubcontractorDashboard() {
           })
           return
         }
+        userId = user.id; // Keep storing user ID
         
-        // Fetch job stats for the subcontractor
+        // Fetch job stats
         const { data: jobsData, error: jobsError } = await supabase
           .from('jobs')
           .select('*')
-          .eq('subcontractor_id', user.id)
+          .eq('subcontractor_id', userId);
 
         if (jobsError) {
-          throw jobsError
+          // Revert to original error handling
+          throw jobsError;
         }
-        
+
         if (jobsData) {
           const statsData = {
             totalJobs: jobsData.length,
             pendingJobs: jobsData.filter(job => job.status === 'pending').length,
             inProgressJobs: jobsData.filter(job => job.status === 'in-progress').length,
             completedJobs: jobsData.filter(job => job.status === 'completed').length,
-          }
-          setJobStats(statsData)
-          
-          // Sort and limit to 5 most recent
-          const sortedJobs = [...jobsData].sort((a, b) => 
+          };
+          setJobStats(statsData);
+
+          const sortedJobs = [...jobsData].sort((a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          ).slice(0, 5)
-          
-          setRecentJobs(sortedJobs)
+          ).slice(0, 5);
+          setRecentJobs(sortedJobs);
         }
 
         // Fetch notifications
         const { data: notificationsData, error: notificationsError } = await supabase
           .from('notifications')
           .select('*')
-          .eq('recipient_id', user.id)
+          .eq('recipient_id', userId)
           .eq('read', false)
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(5);
 
         if (notificationsError) {
-          throw notificationsError
+          // Revert to original error handling
+          throw notificationsError;
         }
-        
+
         if (notificationsData) {
-          setNotifications(notificationsData)
+          setNotifications(notificationsData);
         }
         
       } catch (error) {
+        // Revert to original catch block
         console.error('Error loading dashboard data:', error)
         toast({
           variant: "destructive",
           title: "Failed to load dashboard",
-          description: "There was a problem loading your dashboard data. Please try again.",
+          description: "There was a problem loading your dashboard data. Please try again.", // Original message
         })
       } finally {
         setLoading(false)

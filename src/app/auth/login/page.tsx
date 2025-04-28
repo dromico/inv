@@ -48,35 +48,27 @@ export default function LoginPage() {
       setIsLoading(true)
       
       // Sign in with email and password
-      const { error } = await supabase.auth.signInWithPassword({
+      const signInResponse = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       })
       
-      if (error) {
-        throw error
+      if (signInResponse.error) {
+        throw signInResponse.error
       }
       
       // Get user data
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: userData, error: getUserError } = await supabase.auth.getUser()
       
-      if (!user) {
-        throw new Error("User not found")
+      if (getUserError || !userData?.user) {
+        console.error('Error getting user after sign in:', getUserError)
+        throw new Error("User not found after sign in")
       }
       
-      // Get user profile to determine role
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+      const user = userData.user
       
-      if (profileError) {
-        console.error('Error fetching profile:', profileError)
-      }
-      
-      // Default to 'subcontractor' if profile not found or role not set
-      const role = profile?.role || 'subcontractor'
+      // Get role from user metadata, default to 'subcontractor'
+      const role = user.user_metadata?.role || 'subcontractor'
       
       toast({
         title: "Login successful",
