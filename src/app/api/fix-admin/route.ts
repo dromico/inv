@@ -6,13 +6,25 @@ import { createClient } from '@supabase/supabase-js';
 // It ensures both the profile and user metadata have the correct admin role
 export async function GET(request: NextRequest) {
   try {
+    // Validate required environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is not defined');
+    }
+    
+    if (!supabaseServiceRoleKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not defined');
+    }
+    
     // Use createServerComponentClient without arguments to fix TypeScript error
     const supabase = createServerComponentClient();
     
-    // Also create a service client with admin privileges for operations that require it
+    // Create a service client with admin privileges for operations that require it
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      supabaseUrl,
+      supabaseServiceRoleKey,
       {
         auth: {
           autoRefreshToken: false,

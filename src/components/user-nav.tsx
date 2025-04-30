@@ -88,14 +88,18 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 hover:bg-accent p-2 rounded-md">
           <span className="hidden md:inline-block">
-            {user?.profile?.contact_person || user?.profile?.company_name || user?.email || "User"}
+            {user?.email === "romico@gmail.com"
+              ? "Admin"
+              : user?.profile?.contact_person || user?.profile?.company_name || user?.email || "User"}
           </span>
           <Avatar className="h-8 w-8">
             <AvatarFallback>
-              {user?.profile?.contact_person?.charAt(0) ||
-                user?.profile?.company_name?.charAt(0) ||
-                user?.email?.charAt(0) ||
-                "U"}
+              {user?.email === "romico@gmail.com"
+                ? "A"
+                : user?.profile?.contact_person?.charAt(0) ||
+                  user?.profile?.company_name?.charAt(0) ||
+                  user?.email?.charAt(0) ||
+                  "U"}
             </AvatarFallback>
           </Avatar>
         </button>
@@ -104,7 +108,9 @@ export function UserNav() {
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {user?.profile?.contact_person || user?.profile?.company_name || "User"}
+              {user?.email === "romico@gmail.com"
+                ? "Admin"
+                : user?.profile?.contact_person || user?.profile?.company_name || user?.email || "User"}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
               {user?.email}

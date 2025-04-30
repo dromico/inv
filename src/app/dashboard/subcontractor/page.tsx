@@ -24,12 +24,16 @@ export default function SubcontractorDashboard() {
 
   useEffect(() => {
     async function loadDashboardData() {
-      try {
-        setLoading(true)
-        // Removed userId variable initialization
+      try {        setLoading(true)
         let userId = null;
         
-        const { data: { user } } = await supabase.auth.getUser()
+        // Get current user with improved error handling
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          throw new Error(`Authentication error: ${userError.message}`);
+        }
+        
         if (!user) {
           toast({
             variant: "destructive",
@@ -38,35 +42,29 @@ export default function SubcontractorDashboard() {
           })
           return
         }
-        userId = user.id; // Keep storing user ID
-        
-        // Fetch job stats
+        userId = user.id;
+          // Fetch job stats
         const { data: jobsData, error: jobsError } = await supabase
           .from('jobs')
           .select('*')
           .eq('subcontractor_id', userId);
 
         if (jobsError) {
-          // Revert to original error handling
-          throw jobsError;
-        }
+          throw new Error(`Error fetching jobs: ${jobsError.message}`);
+        }        // Always set data, even if null, to prevent state inconsistencies
+        const jobsList = jobsData || [];
+        const statsData = {
+          totalJobs: jobsList.length,
+          pendingJobs: jobsList.filter(job => job.status === 'pending').length,
+          inProgressJobs: jobsList.filter(job => job.status === 'in-progress').length,
+          completedJobs: jobsList.filter(job => job.status === 'completed').length,
+        };
+        setJobStats(statsData);
 
-        if (jobsData) {
-          const statsData = {
-            totalJobs: jobsData.length,
-            pendingJobs: jobsData.filter(job => job.status === 'pending').length,
-            inProgressJobs: jobsData.filter(job => job.status === 'in-progress').length,
-            completedJobs: jobsData.filter(job => job.status === 'completed').length,
-          };
-          setJobStats(statsData);
-
-          const sortedJobs = [...jobsData].sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          ).slice(0, 5);
-          setRecentJobs(sortedJobs);
-        }
-
-        // Fetch notifications
+        const sortedJobs = [...jobsList].sort((a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ).slice(0, 5);
+        setRecentJobs(sortedJobs);// Fetch notifications
         const { data: notificationsData, error: notificationsError } = await supabase
           .from('notifications')
           .select('*')
@@ -76,21 +74,17 @@ export default function SubcontractorDashboard() {
           .limit(5);
 
         if (notificationsError) {
-          // Revert to original error handling
-          throw notificationsError;
-        }
-
-        if (notificationsData) {
-          setNotifications(notificationsData);
-        }
-        
-      } catch (error) {
-        // Revert to original catch block
-        console.error('Error loading dashboard data:', error)
+          throw new Error(`Error fetching notifications: ${notificationsError.message}`);
+        }        // Always set notifications, empty array if null
+        setNotifications(notificationsData || []);
+          } catch (error) {
+        // Improve error handling by converting error to a readable string
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error('Error loading dashboard data:', errorMessage);
         toast({
           variant: "destructive",
           title: "Failed to load dashboard",
-          description: "There was a problem loading your dashboard data. Please try again.", // Original message
+          description: "There was a problem loading your dashboard data. Please try again.",
         })
       } finally {
         setLoading(false)

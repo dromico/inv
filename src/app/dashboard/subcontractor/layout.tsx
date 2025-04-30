@@ -19,7 +19,7 @@ export default function SubcontractorDashboardLayout({
           </div>
         </div>
       </div>
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 px-6 py-8">
         <div className="flex flex-col md:grid md:grid-cols-[220px_1fr] md:gap-6">
           <aside className="hidden md:block">
             <DashboardNav />

@@ -106,7 +106,8 @@ export default function NewJobPage() {
         description: "Your job has been submitted successfully.",
       })
       
-      router.push('/dashboard/subcontractor/jobs')
+      // Redirect with success parameter to show persistent feedback
+      router.push('/dashboard/subcontractor/jobs?success=true')
     } catch (error) {
       console.error('Error creating job:', error)
       toast({

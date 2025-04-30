@@ -17,9 +17,10 @@ interface DatePickerProps {
   date: Date | undefined
   setDate: (date: Date | undefined) => void
   disabled?: boolean
+  className?: string
 }
 
-export function DatePicker({ date, setDate, disabled = false }: DatePickerProps) {
+export function DatePicker({ date, setDate, disabled = false, className }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
   // Handle date selection and close the popover when a date is selected
@@ -37,7 +38,8 @@ export function DatePicker({ date, setDate, disabled = false }: DatePickerProps)
           variant={"outline"}
           className={cn(
             "w-full justify-start text-left font-normal",
-            !date && "text-muted-foreground"
+            !date && "text-muted-foreground",
+            className
           )}
           disabled={disabled}
           onClick={() => !disabled && setOpen(true)}

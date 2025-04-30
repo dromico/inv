@@ -4,6 +4,7 @@ import { createServerComponentClient } from "@/lib/supabase-server"
 import { Job } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { JobSubmissionSuccess } from "@/components/job-submission-success"
 import {
   Table,
   TableBody,
@@ -84,6 +85,9 @@ export default async function JobsPage() {
           </Button>
         </div>
         
+        {/* Success message for job submission - shown even in error state */}
+        <JobSubmissionSuccess />
+        
         <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground mb-4">Failed to load jobs. Please try again later.</p>
         </div>
@@ -106,6 +110,9 @@ export default async function JobsPage() {
           </Link>
         </Button>
       </div>
+      
+      {/* Success message for job submission */}
+      <JobSubmissionSuccess />
       
       <div className="rounded-md border">
         {jobs && jobs.length > 0 ? (

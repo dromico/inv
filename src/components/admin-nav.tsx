@@ -11,6 +11,7 @@ import {
   ListTodo,
   Settings,
   BarChart4,
+  Bell,
 } from "lucide-react"
 
 const navItems = [
@@ -38,6 +39,11 @@ const navItems = [
     title: "Reports",
     href: "/dashboard/admin/reports",
     icon: BarChart4,
+  },
+  {
+    title: "Notifications",
+    href: "/dashboard/admin/notifications",
+    icon: Bell,
   },
   {
     title: "Settings",
