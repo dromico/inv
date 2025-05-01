@@ -5,7 +5,6 @@ import { createClientComponentClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -25,40 +24,91 @@ import {
 } from "@/components/ui/select"
 import { Avatar } from "@/components/ui/avatar"
 import { User, Settings, Bell, Shield, Mail } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Switch } from "@/components/ui/switch"
 
-interface Profile {
-  id: string
-  company_name: string
-  contact_name: string
-  email: string
-  phone: string
-  address: string
-  business_registration: string
-  services: string[]
-  bio: string
-  avatar_url?: string
-}
+// Define the profile schema for validation
+const profileSchema = z.object({
+  company_name: z.string().min(2, { message: "Company name must be at least 2 characters" }),
+  contact_person: z.string().min(2, { message: "Contact person name is required" }).nullable(),
+  phone_number: z.string().min(5, { message: "Phone number is required" }).nullable(),
+  address: z.string().min(5, { message: "Address is required" }).nullable(),
+  // Additional fields can be added here
+});
 
-interface NotificationPreferences {
-  email_notifications: boolean
-  job_updates: boolean
-  invoice_updates: boolean
-  system_announcements: boolean
-}
+// Define the notification preferences schema
+const notificationSchema = z.object({
+  email_notifications: z.boolean(),
+  job_updates: z.boolean(),
+  invoice_updates: z.boolean(),
+  system_announcements: z.boolean(),
+});
+
+// Define the password change schema
+const passwordSchema = z.object({
+  currentPassword: z.string().min(1, { message: "Current password is required" }),
+  newPassword: z
+    .string()
+    .min(6, { message: "New password must be at least 6 characters" })
+    .max(64, { message: "New password cannot be longer than 64 characters" }),
+  confirmNewPassword: z.string(),
+}).refine(data => data.newPassword === data.confirmNewPassword, {
+  message: "New passwords do not match",
+  path: ["confirmNewPassword"]
+});
+
+// Define types based on the schemas
+type ProfileFormValues = z.infer<typeof profileSchema>;
+type NotificationFormValues = z.infer<typeof notificationSchema>;
+type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export default function SubcontractorSettingsPage() {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
-    email_notifications: true,
-    job_updates: true,
-    invoice_updates: true,
-    system_announcements: true
-  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("profile")
   const { toast } = useToast()
   const supabase = createClientComponentClient()
+
+  // Initialize forms
+  const profileForm = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      company_name: "",
+      contact_person: "",
+      phone_number: "",
+      address: "",
+    },
+  });
+
+  const notificationForm = useForm<NotificationFormValues>({
+    resolver: zodResolver(notificationSchema),
+    defaultValues: {
+      email_notifications: true,
+      job_updates: true,
+      invoice_updates: true,
+      system_announcements: true,
+    },
+  });
+
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    },
+  });
 
   useEffect(() => {
     loadProfile()
@@ -69,28 +119,45 @@ export default function SubcontractorSettingsPage() {
       setLoading(true)
       
       // Get the current user
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
       
-      if (!user) {
+      if (userError || !user) {
+        toast({
+          variant: "destructive",
+          title: "Authentication error",
+          description: "Please sign in to access your settings.",
+        })
         setLoading(false)
         return
       }
       
-      // In a real implementation, you would fetch the profile from the database
-      // For now, we'll use mock data
-      const mockProfile: Profile = {
-        id: user.id,
-        company_name: "ABC Construction Services",
-        contact_name: "John Smith",
-        email: user.email || "john@abcconstruction.com",
-        phone: "+60123456789",
-        address: "123 Main Street, Kuala Lumpur, Malaysia",
-        business_registration: "REG12345678",
-        services: ["Electrical", "Plumbing", "General Construction"],
-        bio: "ABC Construction Services has been providing quality construction services for over 10 years. We specialize in electrical, plumbing, and general construction work."
+      // Fetch the profile from the database
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      
+      if (profileError) {
+        console.error('Error loading profile:', profileError)
+        toast({
+          variant: "destructive",
+          title: "Failed to load profile",
+          description: "There was a problem loading your profile. Please try again.",
+        })
+        setLoading(false)
+        return
       }
       
-      setProfile(mockProfile)
+      if (profileData) {
+        // Reset the form with the fetched data
+        profileForm.reset({
+          company_name: profileData.company_name || "",
+          contact_person: profileData.contact_person || "",
+          phone_number: profileData.phone_number || "",
+          address: profileData.address || "",
+        })
+      }
     } catch (error) {
       console.error('Error loading profile:', error)
       toast({
@@ -103,15 +170,36 @@ export default function SubcontractorSettingsPage() {
     }
   }
 
-  const updateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+  const onProfileSubmit = async (data: ProfileFormValues) => {
     try {
       setSaving(true)
       
-      // In a real implementation, you would update the database
-      // For now, we'll just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        toast({
+          variant: "destructive",
+          title: "Authentication error",
+          description: "Please sign in to update your profile.",
+        })
+        return
+      }
+      
+      // Call the API to update the profile
+      const response = await fetch('/api/subcontractor/settings/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update profile')
+      }
       
       toast({
         title: "Profile updated",
@@ -122,14 +210,14 @@ export default function SubcontractorSettingsPage() {
       toast({
         variant: "destructive",
         title: "Failed to update profile",
-        description: "There was a problem updating your profile. Please try again.",
+        description: error instanceof Error ? error.message : "There was a problem updating your profile. Please try again.",
       })
     } finally {
       setSaving(false)
     }
   }
 
-  const updateNotificationPreferences = async () => {
+  const onNotificationSubmit = async (data: NotificationFormValues) => {
     try {
       setSaving(true)
       
@@ -153,9 +241,7 @@ export default function SubcontractorSettingsPage() {
     }
   }
 
-  const updatePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+  const onPasswordSubmit = async (data: PasswordFormValues) => {
     try {
       setSaving(true)
       
@@ -169,8 +255,7 @@ export default function SubcontractorSettingsPage() {
       })
       
       // Reset the form
-      const form = e.target as HTMLFormElement
-      form.reset()
+      passwordForm.reset()
     } catch (error) {
       console.error('Error updating password:', error)
       toast({
@@ -236,110 +321,88 @@ export default function SubcontractorSettingsPage() {
                 Update your company and contact information
               </CardDescription>
             </CardHeader>
-            <form onSubmit={updateProfile}>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-16 w-16">
-                    <div className="flex h-full w-full items-center justify-center bg-muted text-xl font-medium uppercase">
-                      {profile?.company_name?.charAt(0) || 'A'}
+            <Form {...profileForm}>
+              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-16 w-16">
+                      <div className="flex h-full w-full items-center justify-center bg-muted text-xl font-medium uppercase">
+                        {profileForm.getValues().company_name?.charAt(0) || 'A'}
+                      </div>
+                    </Avatar>
+                    <div>
+                      <Button variant="outline" size="sm" type="button">
+                        Change Avatar
+                      </Button>
                     </div>
-                  </Avatar>
-                  <div>
-                    <Button variant="outline" size="sm">
-                      Change Avatar
-                    </Button>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company_name">Company Name</Label>
-                    <Input 
-                      id="company_name" 
-                      value={profile?.company_name || ''} 
-                      onChange={(e) => setProfile({...profile!, company_name: e.target.value})}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={profileForm.control}
+                      name="company_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="contact_person"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact Person</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_name">Contact Person</Label>
-                    <Input 
-                      id="contact_name" 
-                      value={profile?.contact_name || ''} 
-                      onChange={(e) => setProfile({...profile!, contact_name: e.target.value})}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={profileForm.control}
+                      name="phone_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      value={profile?.email || ''} 
-                      onChange={(e) => setProfile({...profile!, email: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input 
-                      id="phone" 
-                      value={profile?.phone || ''} 
-                      onChange={(e) => setProfile({...profile!, phone: e.target.value})}
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="address">Business Address</Label>
-                  <Textarea 
-                    id="address" 
-                    value={profile?.address || ''} 
-                    onChange={(e) => setProfile({...profile!, address: e.target.value})}
+                  
+                  <FormField
+                    control={profileForm.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Address</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="business_registration">Business Registration Number</Label>
-                    <Input 
-                      id="business_registration" 
-                      value={profile?.business_registration || ''} 
-                      onChange={(e) => setProfile({...profile!, business_registration: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="services">Services Offered</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select services" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="electrical">Electrical</SelectItem>
-                        <SelectItem value="plumbing">Plumbing</SelectItem>
-                        <SelectItem value="construction">General Construction</SelectItem>
-                        <SelectItem value="hvac">HVAC</SelectItem>
-                        <SelectItem value="painting">Painting</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="bio">Company Bio</Label>
-                  <Textarea 
-                    id="bio" 
-                    value={profile?.bio || ''} 
-                    onChange={(e) => setProfile({...profile!, bio: e.target.value})}
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </CardFooter>
-            </form>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Form>
           </Card>
         )}
         
@@ -351,84 +414,100 @@ export default function SubcontractorSettingsPage() {
                 Choose how and when you want to be notified
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email_notifications">Email Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications via email
-                  </p>
-                </div>
-                <div className="h-6 w-11 cursor-pointer rounded-full bg-muted p-1" 
-                  onClick={() => setNotificationPrefs({
-                    ...notificationPrefs, 
-                    email_notifications: !notificationPrefs.email_notifications
-                  })}>
-                  <div className={`h-4 w-4 rounded-full bg-white transition-all ${
-                    notificationPrefs.email_notifications ? 'translate-x-5' : 'translate-x-0'
-                  }`}></div>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="job_updates">Job Updates</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Notifications about job status changes
-                  </p>
-                </div>
-                <div className="h-6 w-11 cursor-pointer rounded-full bg-muted p-1" 
-                  onClick={() => setNotificationPrefs({
-                    ...notificationPrefs, 
-                    job_updates: !notificationPrefs.job_updates
-                  })}>
-                  <div className={`h-4 w-4 rounded-full bg-white transition-all ${
-                    notificationPrefs.job_updates ? 'translate-x-5' : 'translate-x-0'
-                  }`}></div>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="invoice_updates">Invoice Updates</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Notifications about invoice status changes
-                  </p>
-                </div>
-                <div className="h-6 w-11 cursor-pointer rounded-full bg-muted p-1" 
-                  onClick={() => setNotificationPrefs({
-                    ...notificationPrefs, 
-                    invoice_updates: !notificationPrefs.invoice_updates
-                  })}>
-                  <div className={`h-4 w-4 rounded-full bg-white transition-all ${
-                    notificationPrefs.invoice_updates ? 'translate-x-5' : 'translate-x-0'
-                  }`}></div>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="system_announcements">System Announcements</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Important system updates and announcements
-                  </p>
-                </div>
-                <div className="h-6 w-11 cursor-pointer rounded-full bg-muted p-1" 
-                  onClick={() => setNotificationPrefs({
-                    ...notificationPrefs, 
-                    system_announcements: !notificationPrefs.system_announcements
-                  })}>
-                  <div className={`h-4 w-4 rounded-full bg-white transition-all ${
-                    notificationPrefs.system_announcements ? 'translate-x-5' : 'translate-x-0'
-                  }`}></div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={updateNotificationPreferences} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Preferences'}
-              </Button>
-            </CardFooter>
+            <Form {...notificationForm}>
+              <form onSubmit={notificationForm.handleSubmit(onNotificationSubmit)}>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={notificationForm.control}
+                    name="email_notifications"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Email Notifications</FormLabel>
+                          <FormDescription>
+                            Receive notifications via email
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={notificationForm.control}
+                    name="job_updates"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Job Updates</FormLabel>
+                          <FormDescription>
+                            Notifications about job status changes
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={notificationForm.control}
+                    name="invoice_updates"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Invoice Updates</FormLabel>
+                          <FormDescription>
+                            Notifications about invoice status changes
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={notificationForm.control}
+                    name="system_announcements"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">System Announcements</FormLabel>
+                          <FormDescription>
+                            Important system updates and announcements
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Preferences'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Form>
           </Card>
         )}
         
@@ -441,27 +520,56 @@ export default function SubcontractorSettingsPage() {
                   Update your password to keep your account secure
                 </CardDescription>
               </CardHeader>
-              <form onSubmit={updatePassword}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="current_password">Current Password</Label>
-                    <Input id="current_password" type="password" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new_password">New Password</Label>
-                    <Input id="new_password" type="password" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm_password">Confirm New Password</Label>
-                    <Input id="confirm_password" type="password" required />
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? 'Updating...' : 'Update Password'}
-                  </Button>
-                </CardFooter>
-              </form>
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={passwordForm.control}
+                      name="currentPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>New Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="confirmNewPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm New Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                  <CardFooter>
+                    <Button type="submit" disabled={saving}>
+                      {saving ? 'Updating...' : 'Update Password'}
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Form>
             </Card>
             
             <Card>
@@ -474,9 +582,9 @@ export default function SubcontractorSettingsPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>Primary Email</Label>
+                    <FormLabel>Primary Email</FormLabel>
                     <p className="text-sm text-muted-foreground">
-                      {profile?.email}
+                      {/* Display user email here */}
                     </p>
                   </div>
                   <Button variant="outline" size="sm">
@@ -498,15 +606,59 @@ function SettingsLoadingSkeleton() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Account Settings</h2>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
+        <Skeleton className="h-8 w-[250px] mb-2" />
+        <Skeleton className="h-4 w-[350px]" />
       </div>
       
-      <div className="space-y-2">
-        <Skeleton className="h-10 w-[400px]" />
-        <Skeleton className="h-[600px] w-full" />
+      <div className="space-y-4">
+        <div className="flex space-x-2 border-b">
+          <Skeleton className="h-10 w-[100px]" />
+          <Skeleton className="h-10 w-[100px]" />
+          <Skeleton className="h-10 w-[100px]" />
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-16 w-16 rounded-full" />
+              <Skeleton className="h-9 w-[120px]" />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Skeleton className="h-10 w-[120px]" />
+          </CardFooter>
+        </Card>
       </div>
     </div>
   )

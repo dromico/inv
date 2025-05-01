@@ -81,23 +81,26 @@ export default function NewJobPage() {
         0
       )
       
+      // Prepare data for insertion
+      const insertData = {
+        subcontractor_id: user.id,
+        job_type: data.line_items[0].item_name, // Use first line item as main job type for backward compatibility
+        location: data.location,
+        start_date: format(data.start_date, "yyyy-MM-dd"),
+        end_date: format(data.end_date, "yyyy-MM-dd"),
+        unit: data.line_items[0].unit_quantity, // Use first line item for backward compatibility
+        unit_price: data.line_items[0].unit_price, // Use first line item for backward compatibility
+        // total: grandTotal, // REMOVED: Cannot insert into a generated column
+        notes: data.notes || null,
+        status: 'pending',
+        // Store all line items as JSON for the new multi-item functionality
+        line_items: lineItemsWithTotals
+      };
+
       // Insert job into the database
       const { error } = await supabase
         .from('jobs')
-        .insert({
-          subcontractor_id: user.id,
-          job_type: data.line_items[0].item_name, // Use first line item as main job type for backward compatibility
-          location: data.location,
-          start_date: format(data.start_date, "yyyy-MM-dd"),
-          end_date: format(data.end_date, "yyyy-MM-dd"),
-          unit: data.line_items[0].unit_quantity, // Use first line item for backward compatibility
-          unit_price: data.line_items[0].unit_price, // Use first line item for backward compatibility
-          total: grandTotal, // Include the calculated grand total
-          notes: data.notes || null,
-          status: 'pending',
-          // Store all line items as JSON for the new multi-item functionality
-          line_items: lineItemsWithTotals
-        })
+        .insert(insertData); // Use the prepared data object
       
       if (error) throw error
       
@@ -107,13 +110,14 @@ export default function NewJobPage() {
       })
       
       // Redirect with success parameter to show persistent feedback
-      router.push('/dashboard/subcontractor/jobs?success=true')
-    } catch (error) {
-      console.error('Error creating job:', error)
+      router.push('/dashboard/subcontractor/jobs') // Redirect to main jobs list on success
+    } catch (error: any) {
+      // Log the error for debugging purposes
+      console.error('Error creating job:', error);
       toast({
         variant: "destructive",
         title: "Failed to create job",
-        description: "There was a problem creating your job. Please try again.",
+        description: `There was a problem: ${error?.message || 'An unexpected error occurred.'}`, // Show message in toast
       })
     } finally {
       setIsSubmitting(false)
