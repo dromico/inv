@@ -274,18 +274,18 @@ export default function SubcontractorSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4 md:px-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Account Settings</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Account Settings</h2>
         <p className="text-muted-foreground">
           Manage your account settings and preferences
         </p>
       </div>
       
       <div className="space-y-4">
-        <div className="flex space-x-2 border-b">
+        <div className="flex space-x-1 sm:space-x-2 border-b overflow-x-auto">
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'profile' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-2 py-1 sm:px-3 md:px-4 sm:py-2 font-medium ${activeTab === 'profile' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('profile')}
           >
             <div className="flex items-center gap-2">
@@ -294,7 +294,7 @@ export default function SubcontractorSettingsPage() {
             </div>
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'notifications' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-2 py-1 sm:px-3 md:px-4 sm:py-2 font-medium ${activeTab === 'notifications' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('notifications')}
           >
             <div className="flex items-center gap-2">
@@ -303,7 +303,7 @@ export default function SubcontractorSettingsPage() {
             </div>
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'security' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-2 py-1 sm:px-3 md:px-4 sm:py-2 font-medium ${activeTab === 'security' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('security')}
           >
             <div className="flex items-center gap-2">
@@ -315,7 +315,7 @@ export default function SubcontractorSettingsPage() {
         
         {activeTab === 'profile' && (
           <Card>
-            <CardHeader>
+            <CardHeader className="p-3 sm:p-5 md:p-6">
               <CardTitle>Profile Information</CardTitle>
               <CardDescription>
                 Update your company and contact information
@@ -323,7 +323,7 @@ export default function SubcontractorSettingsPage() {
             </CardHeader>
             <Form {...profileForm}>
               <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-5 md:p-6">
                   <div className="flex items-center space-x-4">
                     <Avatar className="h-16 w-16">
                       <div className="flex h-full w-full items-center justify-center bg-muted text-xl font-medium uppercase">
@@ -337,7 +337,7 @@ export default function SubcontractorSettingsPage() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <FormField
                       control={profileForm.control}
                       name="company_name"
@@ -366,7 +366,7 @@ export default function SubcontractorSettingsPage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <FormField
                       control={profileForm.control}
                       name="phone_number"
@@ -396,7 +396,7 @@ export default function SubcontractorSettingsPage() {
                     )}
                   />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="p-3 sm:p-5 md:p-6">
                   <Button type="submit" disabled={saving}>
                     {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
@@ -408,7 +408,7 @@ export default function SubcontractorSettingsPage() {
         
         {activeTab === 'notifications' && (
           <Card>
-            <CardHeader>
+            <CardHeader className="p-3 sm:p-5 md:p-6">
               <CardTitle>Notification Preferences</CardTitle>
               <CardDescription>
                 Choose how and when you want to be notified
@@ -416,12 +416,12 @@ export default function SubcontractorSettingsPage() {
             </CardHeader>
             <Form {...notificationForm}>
               <form onSubmit={notificationForm.handleSubmit(onNotificationSubmit)}>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-5 md:p-6">
                   <FormField
                     control={notificationForm.control}
                     name="email_notifications"
                     render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                      <FormItem className="flex items-center justify-between rounded-lg border p-2 sm:p-3 md:p-4">
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Email Notifications</FormLabel>
                           <FormDescription>
@@ -442,7 +442,7 @@ export default function SubcontractorSettingsPage() {
                     control={notificationForm.control}
                     name="job_updates"
                     render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                      <FormItem className="flex items-center justify-between rounded-lg border p-2 sm:p-3 md:p-4">
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Job Updates</FormLabel>
                           <FormDescription>
@@ -463,7 +463,7 @@ export default function SubcontractorSettingsPage() {
                     control={notificationForm.control}
                     name="invoice_updates"
                     render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                      <FormItem className="flex items-center justify-between rounded-lg border p-2 sm:p-3 md:p-4">
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Invoice Updates</FormLabel>
                           <FormDescription>
@@ -484,7 +484,7 @@ export default function SubcontractorSettingsPage() {
                     control={notificationForm.control}
                     name="system_announcements"
                     render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                      <FormItem className="flex items-center justify-between rounded-lg border p-2 sm:p-3 md:p-4">
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">System Announcements</FormLabel>
                           <FormDescription>
@@ -501,7 +501,7 @@ export default function SubcontractorSettingsPage() {
                     )}
                   />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="p-3 sm:p-5 md:p-6">
                   <Button type="submit" disabled={saving}>
                     {saving ? 'Saving...' : 'Save Preferences'}
                   </Button>
@@ -514,7 +514,7 @@ export default function SubcontractorSettingsPage() {
         {activeTab === 'security' && (
           <div className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="p-3 sm:p-5 md:p-6">
                 <CardTitle>Change Password</CardTitle>
                 <CardDescription>
                   Update your password to keep your account secure
@@ -522,7 +522,7 @@ export default function SubcontractorSettingsPage() {
               </CardHeader>
               <Form {...passwordForm}>
                 <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-5 md:p-6">
                     <FormField
                       control={passwordForm.control}
                       name="currentPassword"
@@ -563,7 +563,7 @@ export default function SubcontractorSettingsPage() {
                       )}
                     />
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="p-3 sm:p-5 md:p-6">
                     <Button type="submit" disabled={saving}>
                       {saving ? 'Updating...' : 'Update Password'}
                     </Button>
@@ -573,13 +573,13 @@ export default function SubcontractorSettingsPage() {
             </Card>
             
             <Card>
-              <CardHeader>
+              <CardHeader className="p-3 sm:p-5 md:p-6">
                 <CardTitle>Email Preferences</CardTitle>
                 <CardDescription>
                   Manage your email settings
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-5 md:p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <FormLabel>Primary Email</FormLabel>
@@ -604,31 +604,31 @@ export default function SubcontractorSettingsPage() {
 // Loading skeleton component
 function SettingsLoadingSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4 md:px-6">
       <div>
         <Skeleton className="h-8 w-[250px] mb-2" />
         <Skeleton className="h-4 w-[350px]" />
       </div>
       
       <div className="space-y-4">
-        <div className="flex space-x-2 border-b">
+        <div className="flex space-x-1 sm:space-x-2 border-b overflow-x-auto">
           <Skeleton className="h-10 w-[100px]" />
           <Skeleton className="h-10 w-[100px]" />
           <Skeleton className="h-10 w-[100px]" />
         </div>
         
         <Card>
-          <CardHeader>
+          <CardHeader className="p-3 sm:p-5 md:p-6">
             <Skeleton className="h-6 w-[200px] mb-2" />
             <Skeleton className="h-4 w-[300px]" />
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-5 md:p-6">
             <div className="flex items-center space-x-4">
               <Skeleton className="h-16 w-16 rounded-full" />
               <Skeleton className="h-9 w-[120px]" />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-[100px]" />
                 <Skeleton className="h-10 w-full" />
@@ -639,7 +639,7 @@ function SettingsLoadingSkeleton() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-[100px]" />
                 <Skeleton className="h-10 w-full" />
@@ -655,7 +655,7 @@ function SettingsLoadingSkeleton() {
               <Skeleton className="h-20 w-full" />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="p-3 sm:p-5 md:p-6">
             <Skeleton className="h-10 w-[120px]" />
           </CardFooter>
         </Card>

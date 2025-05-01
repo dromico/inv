@@ -19,12 +19,12 @@ export default function SubcontractorDashboardLayout({
           </div>
         </div>
       </div>
-      <div className="flex-1 space-y-4 px-12 py-8">
+      <div className="flex-1 space-y-4 px-4 sm:px-6 md:px-8 lg:px-12 py-8">
         <div className="flex flex-col md:grid md:grid-cols-[220px_1fr] md:gap-6">
           <aside className="hidden md:block">
             <DashboardNav />
           </aside>
-          <main className="px-16">
+          <main className="px-2 sm:px-4 md:px-8 lg:px-16">
             {children}
           </main>
         </div>
