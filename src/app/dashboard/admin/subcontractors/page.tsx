@@ -224,50 +224,50 @@ export default function AdminSubcontractorsPage() {
         </p>
       </div>
       
-      <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
-        <div className="flex-1">
-          <form onSubmit={handleSearchSubmit} className="flex w-full max-w-sm items-center space-x-2">
-            <Input
-              type="search"
-              placeholder="Search by name or contact person..."
-              className="flex-1"
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
-            <Button type="submit" size="icon">
-              <Search className="h-4 w-4" />
-              <span className="sr-only">Search</span>
-            </Button>
-          </form>
-        </div>
-        <div className="flex gap-4">
-          <div className="w-[180px]">
-            <Select
-              value={statusFilter}
-              onValueChange={handleStatusFilterChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Subcontractors</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+      {/* Wrap filters, view switcher, and content in Tabs */}
+      <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "card")}>
+        <div className="flex flex-col md:flex-row gap-4 items-end justify-between mb-4"> {/* Added mb-4 */}
+          <div className="flex-1">
+            <form onSubmit={handleSearchSubmit} className="flex w-full max-w-sm items-center space-x-2">
+              <Input
+                type="search"
+                placeholder="Search by name or contact person..."
+                className="flex-1"
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+              <Button type="submit" size="icon">
+                <Search className="h-4 w-4" />
+                <span className="sr-only">Search</span>
+              </Button>
+            </form>
           </div>
-          <div>
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "card")}>
-              <TabsList>
-                <TabsTrigger value="table">Table View</TabsTrigger>
-                <TabsTrigger value="card">Card View</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </div>
-      </div>
-      
-      <TabsContent value="table" className="mt-0">
+          <div className="flex gap-4 items-center"> {/* Added items-center */}
+            <div className="w-[180px]">
+              <Select
+                value={statusFilter}
+                onValueChange={handleStatusFilterChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subcontractors</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* TabsList is now a direct child of Tabs */}
+            <TabsList>
+              <TabsTrigger value="table">Table View</TabsTrigger>
+              <TabsTrigger value="card">Card View</TabsTrigger>
+            </TabsList>
+          </div> {/* Closes flex gap-4 */}
+        </div> {/* Closes flex container for filters/search */}
+
+        {/* TabsContent remains a direct child of Tabs */}
+        <TabsContent value="table" className="mt-0">
         <div className="rounded-md border">
           {loading ? (
             <div className="p-8 text-center">
@@ -412,9 +412,9 @@ export default function AdminSubcontractorsPage() {
         )}
       </TabsContent>
       
-      {/* Pagination */}
+      {/* Pagination - Now inside the Tabs component */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-6"> {/* Added pt-6 */}
           <div className="text-sm text-muted-foreground">
             Showing {((currentPage - 1) * subcontractorsPerPage) + 1} to {Math.min(currentPage * subcontractorsPerPage, totalSubcontractors)} of {totalSubcontractors} subcontractors
           </div>
@@ -485,8 +485,11 @@ export default function AdminSubcontractorsPage() {
           </div>
         </div>
       )}
+      {/* End Pagination */}
+
+      </Tabs> {/* Closing the Tabs component started before the filters */}
       
-      {/* Subcontractor details dialog */}
+      {/* Subcontractor details dialog - Outside the Tabs component */}
       {selectedSubcontractor && (
         <Dialog open={!!selectedSubcontractor} onOpenChange={() => setSelectedSubcontractor(null)}>
           <DialogContent className="sm:max-w-[525px]">
