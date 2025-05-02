@@ -2,10 +2,24 @@
   "mcpServers": {
     "context7": {
       "command": "node",
-      "args": ["C:\\Users\\dromi\\AppData\\Roaming\\npm\\node_modules\\@upstash\\context7-mcp\\dist\\index.js"],
+      "args": [
+        "C:\\Users\\dromi\\AppData\\Roaming\\npm\\node_modules\\@upstash\\context7-mcp\\dist\\index.js"
+      ],
       "transportType": "stdio",
       "disabled": false,
       "autoApprove": []
+    },
+      "supabase": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-q",
+        "-y",
+        "@supabase/mcp-server-supabase",
+        "--access-token",
+        "sbp_97706dc8f5d56d535b46da1bb7ac1d50cf5657c6"
+      ]
     }
   }
 }

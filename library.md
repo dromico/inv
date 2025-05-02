@@ -23,6 +23,7 @@ This file serves as a cache to track Context7-compatible library IDs that have b
 | TypeScript | microsoft/typescript | 2025-04-28 | JavaScript with syntax for types |
 | Tailwind CSS | tailwindlabs/tailwindcss | 2025-04-28 | Utility-first CSS framework |
 | Supabase | /supabase/supabase | 2025-04-28 | The open source Firebase alternative |
+| supabase-community/supabase-mcp | /supabase-community/supabase-mcp | 2025-05-02 | Supabase MCP Server |
 
 ## Notes
 
