@@ -10,9 +10,8 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Increase the static generation timeout
-  staticPageGenerationTimeout: 180,
-  // Use standard output mode
-  // output: 'standalone' - removed to allow npm run dev/start
+  staticPageGenerationTimeout: 180,  // Default handling for builds to make it compatible with both dev and production
+  serverExternalPackages: ['@react-pdf/renderer']
 }
 
 export default nextConfig;
