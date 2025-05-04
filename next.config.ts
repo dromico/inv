@@ -11,8 +11,8 @@ const nextConfig = {
   },
   // Increase the static generation timeout
   staticPageGenerationTimeout: 180,
-  // For production deployment
-  output: 'standalone'
+  // Use standard output mode
+  // output: 'standalone' - removed to allow npm run dev/start
 }
 
 export default nextConfig;
