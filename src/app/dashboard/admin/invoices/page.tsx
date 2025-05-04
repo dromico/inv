@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { createClientComponentClient } from "@/lib/supabase"
-import { Invoice, JobWithSubcontractor } from "@/types"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Correct import for client components
+import { Database, Json } from "@/types/database"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
-  DropdownMenu, 
+import {
+  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -31,9 +31,8 @@ import {
   MoreHorizontal,
   Search,
   CheckCircle,
-  Clock,
-  XCircle,
-  FileText,
+  Send, // For 'sent' status
+  FileText, // For 'generated' status
   Download,
 } from "lucide-react"
 import {
@@ -52,173 +51,223 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Extended Invoice type with job and profile information
-interface InvoiceWithDetails extends Invoice {
-  job: JobWithSubcontractor;
+// Define types based on the actual query structure
+type InvoiceRecord = Database['public']['Tables']['invoices']['Row']
+type JobRecord = Database['public']['Tables']['jobs']['Row']
+type ProfileRecord = Database['public']['Tables']['profiles']['Row']
+
+// Simplified and corrected type for the joined data
+// Assuming 'jobs' might not have 'description' directly, let's use 'job_type' or fallback
+interface InvoiceWithDetails extends InvoiceRecord {
+  jobs: {
+    id: string;
+    job_type: string | null;
+    location: string | null;
+    line_items: Json[] | null;
+  } | null; // Include line_items with proper Json type
+  profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
 }
+
+// Type for subcontractors list
+type SubcontractorInfo = Pick<ProfileRecord, 'id' | 'company_name'> // Remove non-existent full_name field
 
 export default function AdminInvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all") // 'generated', 'sent', 'paid'
   const [subcontractorFilter, setSubcontractorFilter] = useState<string>("all")
-  const [subcontractors, setSubcontractors] = useState<{id: string, company_name: string}[]>([])
+  const [subcontractors, setSubcontractors] = useState<SubcontractorInfo[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalInvoices, setTotalInvoices] = useState(0)
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithDetails | null>(null)
   const invoicesPerPage = 10
-  
+
   const { toast } = useToast()
+  // Initialize client without generic type if it causes issues
   const supabase = createClientComponentClient()
-
-  useEffect(() => {
-    loadInvoices()
-    loadSubcontractors()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, statusFilter, subcontractorFilter])
-
-  const loadSubcontractors = async () => {
+  const loadSubcontractors = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, company_name')
+        .select('id, company_name') // Remove non-existent full_name field
         .eq('role', 'subcontractor')
-      
-      if (error) throw error
-      
+        .order('company_name');
+
+      if (error) throw error;
+
       if (data) {
-        setSubcontractors(data)
+        setSubcontractors(data as SubcontractorInfo[]); // Cast to defined type
       }
     } catch (error) {
-      console.error('Error loading subcontractors:', error)
+      console.error('Error loading subcontractors:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to load subcontractors",
+      });
     }
-  }
+  }, [supabase, toast]);
 
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     try {
-      setLoading(true)
-      
-      let query = supabase
+      setLoading(true);      let query = supabase
         .from('invoices')
         .select(`
           *,
-          job:jobs(
-            *,
-            profile:profiles(*)
-          )
+          jobs ( id, job_type, location, line_items ),
+          profiles ( id, company_name )
         `, { count: 'exact' })
-        .order('issued_date', { ascending: false })
-      
+        .order('invoice_date', { ascending: false });
+
       if (statusFilter !== "all") {
-        query = query.eq('status', statusFilter)
+        query = query.eq('status', statusFilter);
       }
-      
+
       if (subcontractorFilter !== "all") {
-        query = query.eq('job.subcontractor_id', subcontractorFilter)
+        // Filter directly on the subcontractor_id in the invoices table
+        query = query.eq('subcontractor_id', subcontractorFilter);
+      }      if (searchQuery) {
+        // Search in job description or subcontractor company name
+        // Adjust search based on available fields (e.g., job_type, company_name)
+        query = query.or(`jobs.job_type.ilike.%${searchQuery}%,profiles.company_name.ilike.%${searchQuery}%`);
       }
-      
-      if (searchQuery) {
-        query = query.or(`invoice_number.ilike.%${searchQuery}%`)
-      }
-      
+
       // Add pagination
-      const from = (currentPage - 1) * invoicesPerPage
-      const to = from + invoicesPerPage - 1
-      
-      const { data, error, count } = await query
-        .range(from, to)
-      
+      const from = (currentPage - 1) * invoicesPerPage;
+      const to = from + invoicesPerPage - 1;
+
+      const { data, error, count } = await query.range(from, to);
+
       if (error) {
-        throw error
+        throw error;
       }
-      
+
       if (data) {
-        setInvoices(data as unknown as InvoiceWithDetails[])
-        setTotalInvoices(count || 0)
+        // Ensure data matches the expected type
+        setInvoices(data as InvoiceWithDetails[]);
+        setTotalInvoices(count || 0);
+      } else {
+        setInvoices([]);
+        setTotalInvoices(0);
       }
     } catch (error) {
-      console.error('Error loading invoices:', error)
+      console.error('Error loading invoices:', error);
       toast({
         variant: "destructive",
         title: "Failed to load invoices",
         description: "There was a problem loading the invoices. Please try again.",
-      })
+      });
+      setInvoices([]); // Clear invoices on error
+      setTotalInvoices(0);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, [supabase, toast, currentPage, statusFilter, subcontractorFilter, searchQuery, invoicesPerPage]);
+
+
+  useEffect(() => {
+    loadInvoices();
+    loadSubcontractors();
+  }, [loadInvoices, loadSubcontractors]); // Depend on the callback functions
 
   const updateInvoiceStatus = async (invoiceId: string, status: string) => {
     try {
       const { error } = await supabase
         .from('invoices')
-        .update({ status })
-        .eq('id', invoiceId)
-      
+        .update({ status: status, updated_at: new Date().toISOString() }) // Also update updated_at
+        .eq('id', invoiceId);
+
       if (error) {
-        throw error
+        throw error;
       }
-      
+
       toast({
         title: "Status updated",
         description: `Invoice status updated to ${status}`,
-      })
-      
-      loadInvoices()
+      });
+
+      loadInvoices(); // Reload invoices to reflect the change
     } catch (error) {
-      console.error('Error updating invoice status:', error)
+      console.error('Error updating invoice status:', error);
       toast({
         variant: "destructive",
         title: "Failed to update status",
         description: "There was a problem updating the invoice status. Please try again.",
-      })
+      });
     }
-  }
+  };
 
-  const totalPages = Math.ceil(totalInvoices / invoicesPerPage)
+  const totalPages = Math.ceil(totalInvoices / invoicesPerPage);
 
   const handlePageChange = (page: number) => {
-    if (page < 1) page = 1
-    if (page > totalPages) page = totalPages
-    setCurrentPage(page)
-  }
+    if (page < 1) page = 1;
+    if (page > totalPages && totalPages > 0) page = totalPages; // Ensure page doesn't exceed total if > 0
+    if (page !== currentPage) {
+        setCurrentPage(page);
+    }
+  };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-MY')
-  }
-  
-  const formatCurrency = (amount: number) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    try {
+        return new Date(dateString).toLocaleDateString('en-MY', {
+            year: 'numeric', month: 'short', day: 'numeric'
+        });
+    } catch (e) {
+        console.error("Error formatting date:", dateString, e);
+        return 'Invalid Date';
+    }
+  };
+
+  const formatCurrency = (amount: number | null) => {
+    if (amount === null || amount === undefined) return 'N/A';
     return new Intl.NumberFormat('en-MY', {
       style: 'currency',
       currency: 'MYR',
       minimumFractionDigits: 2
-    }).format(amount)
-  }
+    }).format(amount);
+  };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value)
-  }
+    setSearchQuery(e.target.value);
+  };
 
+  // Trigger search on submit or potentially on input change with debounce
   const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCurrentPage(1) // Reset to first page
-    loadInvoices()
-  }
+    e.preventDefault();
+    setCurrentPage(1); // Reset to first page on new search
+    loadInvoices(); // Trigger reload
+  };
 
   const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value)
-    setCurrentPage(1) // Reset to first page
-  }
+    setStatusFilter(value);
+    setCurrentPage(1); // Reset to first page
+    // No need to call loadInvoices here, useEffect dependency array handles it
+  };
 
   const handleSubcontractorFilterChange = (value: string) => {
-    setSubcontractorFilter(value)
-    setCurrentPage(1) // Reset to first page
-  }
+    setSubcontractorFilter(value);
+    setCurrentPage(1); // Reset to first page
+    // No need to call loadInvoices here, useEffect dependency array handles it
+  };
 
   const handleViewDetails = (invoice: InvoiceWithDetails) => {
-    setSelectedInvoice(invoice)
-  }
+    setSelectedInvoice(invoice);
+  };
+
+  // Helper to get status icon and color
+  const getStatusStyle = (status: string | null) => {
+    switch (status) {
+      case 'paid':
+        return { icon: CheckCircle, color: 'text-green-800', bg: 'bg-green-100' };
+      case 'sent':
+        return { icon: Send, color: 'text-blue-800', bg: 'bg-blue-100' };
+      case 'generated':
+      default:
+        return { icon: FileText, color: 'text-amber-800', bg: 'bg-amber-100' };
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -228,13 +277,13 @@ export default function AdminInvoicesPage() {
           View and manage all subcontractor invoices
         </p>
       </div>
-      
+
       <div className="flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-1">
           <form onSubmit={handleSearchSubmit} className="flex w-full max-w-sm items-center space-x-2">
             <Input
               type="search"
-              placeholder="Search invoice number..."
+              placeholder="Search job or subcontractor..."
               className="flex-1"
               value={searchQuery}
               onChange={handleSearchChange}
@@ -255,9 +304,9 @@ export default function AdminInvoicesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="generated">Generated</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -270,17 +319,16 @@ export default function AdminInvoicesPage() {
               <SelectValue placeholder="Filter by subcontractor" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Subcontractors</SelectItem>
-              {subcontractors.map((subcontractor) => (
+              <SelectItem value="all">All Subcontractors</SelectItem>              {subcontractors.map((subcontractor) => (
                 <SelectItem key={subcontractor.id} value={subcontractor.id}>
-                  {subcontractor.company_name}
+                  {subcontractor.company_name || 'N/A'}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
-      
+
       <div className="rounded-md border">
         {loading ? (
           <div className="p-8 text-center">
@@ -290,94 +338,93 @@ export default function AdminInvoicesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice #</TableHead>
+                <TableHead>Invoice Date</TableHead>
                 <TableHead>Subcontractor</TableHead>
-                <TableHead>Issued Date</TableHead>
-                <TableHead>Due Date</TableHead>
+                <TableHead>Job Type/Desc</TableHead>
                 <TableHead className="text-right">Amount (RM)</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                  <TableCell>{invoice.job?.profile?.company_name}</TableCell>
-                  <TableCell>{formatDate(invoice.issued_date)}</TableCell>
-                  <TableCell>{formatDate(invoice.due_date)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(invoice.amount)}</TableCell>
-                  <TableCell>
-                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                      invoice.status === 'overdue' ? 'bg-red-100 text-red-800' : 
-                      'bg-amber-100 text-amber-800'
-                    }`}>
-                      {invoice.status}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleViewDetails(invoice)}>
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        <DropdownMenuItem 
-                          disabled={invoice.status === 'unpaid'}
-                          onClick={() => updateInvoiceStatus(invoice.id, 'unpaid')}
-                        >
-                          <Clock className="mr-2 h-4 w-4 text-amber-500" />
-                          Mark as Unpaid
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          disabled={invoice.status === 'paid'}
-                          onClick={() => updateInvoiceStatus(invoice.id, 'paid')}
-                        >
-                          <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                          Mark as Paid
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          disabled={invoice.status === 'overdue'}
-                          onClick={() => updateInvoiceStatus(invoice.id, 'overdue')}
-                        >
-                          <XCircle className="mr-2 h-4 w-4 text-red-500" />
-                          Mark as Overdue
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/admin/invoices/${invoice.id}`}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Invoice
-                          </Link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {invoices.map((invoice) => {
+                 const statusStyle = getStatusStyle(invoice.status);
+                 return (
+                    <TableRow key={invoice.id}>                      <TableCell className="font-medium">{formatDate(invoice.invoice_date)}</TableCell>
+                      <TableCell>{invoice.profiles?.company_name || 'N/A'}</TableCell>
+                      {/* Display job_type or fallback */}
+                      <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
+                          <statusStyle.icon className="mr-1 h-3 w-3" />
+                          {invoice.status || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleViewDetails(invoice)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              disabled={invoice.status === 'generated'}
+                              onClick={() => updateInvoiceStatus(invoice.id, 'generated')}
+                            >
+                              <FileText className="mr-2 h-4 w-4 text-amber-500" />
+                              Mark as Generated
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={invoice.status === 'sent'}
+                              onClick={() => updateInvoiceStatus(invoice.id, 'sent')}
+                            >
+                              <Send className="mr-2 h-4 w-4 text-blue-500" />
+                              Mark as Sent
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={invoice.status === 'paid'}
+                              onClick={() => updateInvoiceStatus(invoice.id, 'paid')}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                              Mark as Paid
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                              {/* Link uses job_id from the invoice record */}
+                              <Link href={`/dashboard/admin/invoices/${invoice.job_id}`}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Download PDF
+                              </Link>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                 );
+              })}
             </TableBody>
           </Table>
         ) : (
           <div className="p-8 text-center">
-            <p className="text-muted-foreground mb-4">No invoices found</p>
+            <p className="text-muted-foreground mb-4">No invoices found matching your criteria.</p>
           </div>
         )}
       </div>
-      
+
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-4">
           <div className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * invoicesPerPage) + 1} to {Math.min(currentPage * invoicesPerPage, totalInvoices)} of {totalInvoices} invoices
+            Showing {Math.min(((currentPage - 1) * invoicesPerPage) + 1, totalInvoices)} to {Math.min(currentPage * invoicesPerPage, totalInvoices)} of {totalInvoices} invoices
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -398,33 +445,10 @@ export default function AdminInvoicesPage() {
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Previous page</span>
             </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                let pageNum = i + 1;
-                
-                // Show pages around current page if there are many pages
-                if (totalPages > 5) {
-                  if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                }
-                
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={pageNum === currentPage ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => handlePageChange(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
+            {/* Simple page number display for brevity */}
+             <span className="text-sm font-medium">
+               Page {currentPage} of {totalPages}
+             </span>
             <Button
               variant="outline"
               size="icon"
@@ -446,7 +470,7 @@ export default function AdminInvoicesPage() {
           </div>
         </div>
       )}
-      
+
       {/* Invoice details dialog */}
       {selectedInvoice && (
         <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
@@ -454,73 +478,109 @@ export default function AdminInvoicesPage() {
             <DialogHeader>
               <DialogTitle>Invoice Details</DialogTitle>
               <DialogDescription>
-                Detailed information about the selected invoice.
+                Detailed information for invoice generated on {formatDate(selectedInvoice.invoice_date)}.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Invoice #:</div>
-                <div className="col-span-3">{selectedInvoice.invoice_number}</div>
+                <div className="font-medium">Invoice ID:</div>
+                <div className="col-span-3 text-xs text-muted-foreground">{selectedInvoice.id}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+               <div className="grid grid-cols-4 items-center gap-4">
+                <div className="font-medium">Job ID:</div>
+                <div className="col-span-3 text-xs text-muted-foreground">{selectedInvoice.job_id}</div>
+              </div>              <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-3">{selectedInvoice.job?.profile?.company_name}</div>
+                <div className="col-span-3">{selectedInvoice.profiles?.company_name || 'N/A'}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job Type:</div>
-                <div className="col-span-3">{selectedInvoice.job?.job_type}</div>
+                <div className="font-medium">Job Desc:</div>
+                {/* Display job_type or fallback */}
+                <div className="col-span-3">{selectedInvoice.jobs?.job_type || 'N/A'}</div>
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <div className="font-medium">Job Location:</div>
+                <div className="col-span-3">{selectedInvoice.jobs?.location || 'N/A'}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Location:</div>
-                <div className="col-span-3">{selectedInvoice.job?.location}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Issued Date:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.issued_date)}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Due Date:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.due_date)}</div>
+                <div className="font-medium">Invoice Date:</div>
+                <div className="col-span-3">{formatDate(selectedInvoice.invoice_date)}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Amount:</div>
-                <div className="col-span-3 font-bold">{formatCurrency(selectedInvoice.amount)}</div>
+                <div className="col-span-3 font-bold">{formatCurrency(selectedInvoice.total_amount)}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Status:</div>
                 <div className="col-span-3">
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    selectedInvoice.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                    selectedInvoice.status === 'overdue' ? 'bg-red-100 text-red-800' : 
-                    'bg-amber-100 text-amber-800'
-                  }`}>
-                    {selectedInvoice.status}
-                  </div>
+                   {(() => {
+                       const statusStyle = getStatusStyle(selectedInvoice.status);
+                       return (
+                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
+                             <statusStyle.icon className="mr-1 h-3 w-3" />
+                             {selectedInvoice.status || 'N/A'}
+                           </div>
+                       );
+                   })()}
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Created:</div>
-                <div className="col-span-3">{new Date(selectedInvoice.created_at).toLocaleString()}</div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <div className="font-medium">Created At:</div>
+                <div className="col-span-3">{formatDate(selectedInvoice.created_at)}</div>
+              </div>               <div className="grid grid-cols-4 items-center gap-4">
+                <div className="font-medium">Last Updated:</div>
+                <div className="col-span-3">{formatDate(selectedInvoice.updated_at)}</div>
+              </div>
+              
+              {/* Line Items Section */}
+              <div className="col-span-4 mt-4">
+                <div className="font-medium mb-2">Line Items:</div>
+                {selectedInvoice.jobs?.line_items && Array.isArray(selectedInvoice.jobs.line_items) && selectedInvoice.jobs.line_items.length > 0 ? (
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Unit Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>                      <TableBody>
+                        {selectedInvoice.jobs.line_items.map((item, index) => {
+                          // Handle both formats of line items
+                          if (typeof item !== 'object' || item === null) {
+                            return null; // Skip non-object items
+                          }
+                          
+                          const itemObj = item as { [key: string]: Json };
+                          const description = String(itemObj.description || itemObj.item_name || 'N/A');
+                          const quantity = Number(itemObj.quantity || itemObj.unit_quantity || 0);
+                          const unitPrice = Number(itemObj.unit_price || 0);
+                          const total = quantity * unitPrice;
+                            return (
+                            <TableRow key={index}>
+                              <TableCell>{String(description)}</TableCell>
+                              <TableCell>{String(quantity)}</TableCell>
+                              <TableCell>{formatCurrency(unitPrice)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(total)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No line items available</div>
+                )}
               </div>
             </div>
             <DialogFooter>
-              <div className="flex gap-2 justify-between w-full">
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      updateInvoiceStatus(selectedInvoice.id, 'paid');
-                      setSelectedInvoice(null);
-                    }}
-                    disabled={selectedInvoice.status === 'paid'}
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
-                  </Button>
-                </div>
-                <div>
-                  <Button variant="outline" onClick={() => setSelectedInvoice(null)}>Close</Button>
-                </div>
-              </div>
+               <Button variant="outline" onClick={() => setSelectedInvoice(null)}>Close</Button>
+               <Button asChild>
+                 <Link href={`/dashboard/admin/invoices/${selectedInvoice.job_id}`}>
+                   <Download className="mr-2 h-4 w-4" /> Download PDF
+                 </Link>
+               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

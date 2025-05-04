@@ -1,0 +1,143 @@
+// src/app/dashboard/admin/invoices/[jobId]/route.tsx
+import { NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import * as ReactPDF from '@react-pdf/renderer';
+import React from 'react';
+import { InvoiceDocument } from '@/components/invoice-pdf';
+import { Database } from '@/types/database';
+
+// Define types based on the expected query result
+type LineItem = {
+  description: string;
+  quantity: number;
+  unit_price: number;
+};
+
+type SubcontractorProfile = {
+  id: string;
+  company_name?: string | null;
+};
+
+// Helper function to calculate total amount from line items
+const calculateTotalAmount = (lineItems: LineItem[] | null): number => {
+  if (!lineItems || lineItems.length === 0) {
+    return 0;
+  }
+  
+  return lineItems.reduce((sum, item) => {
+    const quantity = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unit_price) || 0;
+    return sum + (quantity * unitPrice);
+  }, 0);
+};
+
+export async function GET(
+  request: Request,
+  { params }: { params: { jobId: string } }
+) {
+  try {
+    // Get the jobId from params
+    const { jobId } = params;
+    
+    // Create the Supabase client
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+
+    // 1. Fetch the job data with line items and profile
+    const { data: jobData, error: jobError } = await supabase
+      .from('jobs')
+      .select(`
+        id, job_type, location, start_date, end_date, status, notes, created_at, updated_at,
+        line_items,
+        profiles:subcontractor_id (id, company_name)
+      `)
+      .eq('id', jobId)
+      .single();
+
+    if (jobError) {
+      console.error(`Error fetching job ${jobId}:`, jobError);
+      return NextResponse.json({ error: jobError.message }, { status: 500 });
+    }
+
+    if (!jobData) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    // 2. Prepare data for PDF generation
+    const lineItems = Array.isArray(jobData.line_items) ? jobData.line_items : [];
+    const totalAmount = calculateTotalAmount(lineItems);
+    
+    // Get the subcontractor profile from the job data
+    const subcontractor = jobData.profiles;
+    
+    if (!subcontractor || !subcontractor.id) {
+      return NextResponse.json({ error: 'Subcontractor profile not found' }, { status: 500 });
+    }
+
+    // 3. Fetch invoice recipient text setting
+    const { data: settingsData } = await supabase
+      .from('invoice_settings')
+      .select('setting_value')
+      .eq('setting_key', 'invoice_recipient_text')
+      .maybeSingle();
+
+    const recipientText = settingsData?.setting_value || 'To Whom It May Concern,';
+
+    // 4. Check if invoice already exists or create one
+    const { data: existingInvoice } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('job_id', jobId)
+      .maybeSingle();
+
+    if (!existingInvoice) {
+      // Create new invoice record
+      await supabase.from('invoices').insert({
+        job_id: jobId,
+        invoice_date: new Date().toISOString().split('T')[0],
+        status: 'generated',
+        subcontractor_id: subcontractor.id,
+        total_amount: totalAmount
+      });
+    }
+
+    // 5. Generate the PDF buffer
+    try {
+      // Create the job object for PDF generation
+      const jobForPdf = {
+        id: jobData.id,
+        description: jobData.job_type, // Use job_type as description
+        line_items: lineItems
+      };
+    
+      // Generate PDF using buffer for better browser compatibility
+      const pdfBuffer = await ReactPDF.renderToBuffer(
+        <InvoiceDocument 
+          job={jobForPdf} 
+          subcontractor={subcontractor} 
+          recipientText={recipientText} 
+        />
+      );
+      
+      // Return the PDF as a downloadable file
+      return new Response(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="invoice-${jobId}.pdf"`,
+          'Content-Length': `${pdfBuffer.length}`,
+        },
+      });
+    } catch (pdfError: any) {
+      console.error(`Error generating PDF:`, pdfError);
+      return NextResponse.json({ 
+        error: `PDF generation failed: ${pdfError.message || 'Unknown error'}` 
+      }, { status: 500 });
+    }
+  } catch (error: any) {
+    console.error(`Error in invoice generation:`, error);
+    return NextResponse.json({ 
+      error: `Internal server error: ${error.message || 'Unknown error'}` 
+    }, { status: 500 });
+  }
+}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClientComponentClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -16,15 +16,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Avatar } from "@/components/ui/avatar"
-import { User, Settings, Bell, Shield, Mail, Users, Cog } from "lucide-react"
+import { User, Bell, Shield, Cog, FileText } from "lucide-react"
 
 interface AdminProfile {
   id: string
@@ -69,27 +62,23 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("profile")
+  const [invoiceRecipientText, setInvoiceRecipientText] = useState("")
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
-  useEffect(() => {
-    loadProfile()
-  }, [])
-
-  const loadProfile = async () => {
+  const loadSettingsData = useCallback(async () => {
     try {
       setLoading(true)
-      
+
       // Get the current user
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         setLoading(false)
         return
       }
-      
-      // In a real implementation, you would fetch the profile from the database
-      // For now, we'll use mock data
+
+      // Fetch Profile (Mock for now)
       const mockProfile: AdminProfile = {
         id: user.id,
         name: "Admin User",
@@ -98,19 +87,44 @@ export default function AdminSettingsPage() {
         role: "System Administrator",
         department: "IT Operations"
       }
-      
       setProfile(mockProfile)
+
+      // Fetch Invoice Settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('invoice_settings')
+        .select('setting_value')
+        .eq('setting_key', 'invoice_recipient_text')
+        .single();
+
+      if (settingsError) {
+        console.error('Error fetching invoice settings:', settingsError);
+        toast({
+          variant: "destructive",
+          title: "Failed to load invoice settings",
+          description: "Using default value.",
+        })
+        setInvoiceRecipientText('To Whom It May Concern,') // Default value
+      } else if (settingsData) {
+        setInvoiceRecipientText(settingsData.setting_value);
+      }
+
+      // TODO: Fetch other settings (System, Notifications) from DB if needed
+
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error('Error loading settings data:', error)
       toast({
         variant: "destructive",
-        title: "Failed to load profile",
-        description: "There was a problem loading your profile. Please try again.",
+        title: "Failed to load settings",
+        description: "There was a problem loading settings data. Please try again.",
       })
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, toast])
+
+  useEffect(() => {
+    loadSettingsData()
+  }, [loadSettingsData])
 
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -218,6 +232,33 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const updateInvoiceSettings = async () => {
+    try {
+      setSaving(true)
+
+      const { error } = await supabase
+        .from('invoice_settings')
+        .update({ setting_value: invoiceRecipientText })
+        .eq('setting_key', 'invoice_recipient_text')
+
+      if (error) throw error
+
+      toast({
+        title: "Invoice settings updated",
+        description: "Invoice recipient text has been updated successfully.",
+      })
+    } catch (error) {
+      console.error('Error updating invoice settings:', error)
+      toast({
+        variant: "destructive",
+        title: "Failed to update invoice settings",
+        description: "There was a problem updating the invoice settings. Please try again.",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Handle loading state with skeleton UI
   if (loading) {
     return <SettingsLoadingSkeleton />
@@ -268,6 +309,15 @@ export default function AdminSettingsPage() {
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               <span>Security</span>
+            </div>
+          </button>
+          <button
+            className={`px-4 py-2 font-medium ${activeTab === 'invoice' ? 'border-b-2 border-primary' : ''}`}
+            onClick={() => setActiveTab('invoice')}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span>Invoice</span>
             </div>
           </button>
         </div>
@@ -603,6 +653,37 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {activeTab === 'invoice' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Invoice Settings</CardTitle>
+              <CardDescription>
+                Customize default text used in generated invoices.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoice_recipient_text">Default Recipient Text</Label>
+                <Textarea
+                  id="invoice_recipient_text"
+                  value={invoiceRecipientText}
+                  onChange={(e) => setInvoiceRecipientText(e.target.value)}
+                  rows={3}
+                  placeholder="e.g., To Whom It May Concern,"
+                />
+                <p className="text-sm text-muted-foreground">
+                  This text appears near the top of the invoice before the job details.
+                </p>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={updateInvoiceSettings} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Invoice Settings'}
+              </Button>
+            </CardFooter>
+          </Card>
         )}
       </div>
     </div>

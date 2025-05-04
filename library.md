@@ -24,6 +24,7 @@ This file serves as a cache to track Context7-compatible library IDs that have b
 | Tailwind CSS | tailwindlabs/tailwindcss | 2025-04-28 | Utility-first CSS framework |
 | Supabase | /supabase/supabase | 2025-04-28 | The open source Firebase alternative |
 | supabase-community/supabase-mcp | /supabase-community/supabase-mcp | 2025-05-02 | Supabase MCP Server |
+| @react-pdf/renderer | /diegomura/react-pdf | 2025-05-02 | Create PDF files using React |
 
 ## Notes
 

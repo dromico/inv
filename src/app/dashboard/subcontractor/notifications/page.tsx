@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClientComponentClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -24,11 +24,7 @@ export default function SubcontractorNotificationsPage() {
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
-  useEffect(() => {
-    loadNotifications()
-  }, [])
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -101,7 +97,11 @@ export default function SubcontractorNotificationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, toast])
+
+  useEffect(() => {
+    loadNotifications()
+  }, [loadNotifications])
 
   const markAsRead = async (notificationId: string) => {
     try {
