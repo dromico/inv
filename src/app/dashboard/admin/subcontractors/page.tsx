@@ -414,14 +414,15 @@ export default function AdminSubcontractorsPage() {
       
       {/* Pagination - Now inside the Tabs component */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-6"> {/* Added pt-6 */}
-          <div className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6">
+          <div className="text-sm text-muted-foreground text-center sm:text-left">
             Showing {((currentPage - 1) * subcontractorsPerPage) + 1} to {Math.min(currentPage * subcontractorsPerPage, totalSubcontractors)} of {totalSubcontractors} subcontractors
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(1)}
               disabled={currentPage === 1}
             >
@@ -431,13 +432,14 @@ export default function AdminSubcontractorsPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Previous page</span>
             </Button>
-            <div className="flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1">
               {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                 let pageNum = i + 1;
                 
@@ -457,6 +459,7 @@ export default function AdminSubcontractorsPage() {
                     key={pageNum}
                     variant={pageNum === currentPage ? "default" : "outline"}
                     size="icon"
+                    className="h-8 w-8"
                     onClick={() => handlePageChange(pageNum)}
                   >
                     {pageNum}
@@ -464,9 +467,15 @@ export default function AdminSubcontractorsPage() {
                 );
               })}
             </div>
+            <div className="sm:hidden">
+              <span className="text-sm font-medium">
+                {currentPage} / {totalPages}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
@@ -476,6 +485,7 @@ export default function AdminSubcontractorsPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(totalPages)}
               disabled={currentPage === totalPages}
             >

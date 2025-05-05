@@ -286,22 +286,22 @@ function RecentActivityList() {
   return (
     <div className="space-y-2">
       {activities.map((activity) => (
-        <div key={activity.id} className="flex items-start gap-3 p-3 rounded-md border">
+        <div key={activity.id} className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-md border">
           {getActivityIcon(activity.type)}
-          <div className="flex-1">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="font-medium">{activity.title}</p>
-                <p className="text-sm text-muted-foreground">
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-start">
+              <div className="min-w-0">
+                <p className="font-medium truncate">{activity.title}</p>
+                <p className="text-sm text-muted-foreground truncate">
                   {activity.description}
-                  {activity.subcontractor && (
-                    <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded">
-                      {activity.subcontractor.name}
-                    </span>
-                  )}
                 </p>
+                {activity.subcontractor && (
+                  <span className="inline-block mt-1 text-xs bg-muted px-1.5 py-0.5 rounded">
+                    {activity.subcontractor.name}
+                  </span>
+                )}
               </div>
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
                 <span className="text-xs text-muted-foreground">
                   {formatTimestamp(activity.timestamp)}
                 </span>
@@ -410,7 +410,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
@@ -470,7 +470,7 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
@@ -490,7 +490,7 @@ export default function AdminDashboardPage() {
                 <RecentActivityList />
               )}
               
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col sm:flex-row justify-end gap-2">
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/dashboard/admin/jobs">
                     View all jobs <ArrowRightIcon className="ml-1 h-4 w-4" />

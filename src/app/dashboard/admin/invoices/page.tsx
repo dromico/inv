@@ -335,84 +335,136 @@ export default function AdminInvoicesPage() {
             <p className="text-muted-foreground">Loading invoices...</p>
           </div>
         ) : invoices.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice Date</TableHead>
-                <TableHead>Subcontractor</TableHead>
-                <TableHead>Job Type/Desc</TableHead>
-                <TableHead className="text-right">Amount (RM)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map((invoice) => {
-                 const statusStyle = getStatusStyle(invoice.status);
-                 return (
-                    <TableRow key={invoice.id}>                      <TableCell className="font-medium">{formatDate(invoice.invoice_date)}</TableCell>
-                      <TableCell>{invoice.profiles?.company_name || 'N/A'}</TableCell>
-                      {/* Display job_type or fallback */}
-                      <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
-                      <TableCell>
+          <>
+            {/* Mobile card view */}
+            <div className="md:hidden">
+              <div className="space-y-4 p-4">
+                {invoices.map((invoice) => {
+                  const statusStyle = getStatusStyle(invoice.status);
+                  return (
+                    <div key={invoice.id} className="rounded-lg border p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-medium">{formatDate(invoice.invoice_date)}</h3>
                         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                           <statusStyle.icon className="mr-1 h-3 w-3" />
                           {invoice.status || 'N/A'}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleViewDetails(invoice)}>
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              disabled={invoice.status === 'generated'}
-                              onClick={() => updateInvoiceStatus(invoice.id, 'generated')}
-                            >
-                              <FileText className="mr-2 h-4 w-4 text-amber-500" />
-                              Mark as Generated
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={invoice.status === 'sent'}
-                              onClick={() => updateInvoiceStatus(invoice.id, 'sent')}
-                            >
-                              <Send className="mr-2 h-4 w-4 text-blue-500" />
-                              Mark as Sent
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={invoice.status === 'paid'}
-                              onClick={() => updateInvoiceStatus(invoice.id, 'paid')}
-                            >
-                              <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                              Mark as Paid
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              {/* Link uses job_id from the invoice record */}
-                              <Link href={`/dashboard/admin/invoices/${invoice.job_id}`}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download PDF
-                              </Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                 );
-              })}
-            </TableBody>
-          </Table>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Subcontractor</p>
+                          <p className="truncate">{invoice.profiles?.company_name || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Job Type</p>
+                          <p className="truncate">{invoice.jobs?.job_type || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Amount</p>
+                          <p className="font-medium">{formatCurrency(invoice.total_amount)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
+                          Details
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/admin/invoices/${invoice.job_id}`}>
+                            <Download className="h-4 w-4 mr-1" /> PDF
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Desktop table view */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>Subcontractor</TableHead>
+                    <TableHead>Job Type/Desc</TableHead>
+                    <TableHead className="text-right">Amount (RM)</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => {
+                    const statusStyle = getStatusStyle(invoice.status);
+                    return (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">{formatDate(invoice.invoice_date)}</TableCell>
+                        <TableCell>{invoice.profiles?.company_name || 'N/A'}</TableCell>
+                        {/* Display job_type or fallback */}
+                        <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
+                        <TableCell>
+                          <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
+                            <statusStyle.icon className="mr-1 h-3 w-3" />
+                            {invoice.status || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => handleViewDetails(invoice)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                disabled={invoice.status === 'generated'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'generated')}
+                              >
+                                <FileText className="mr-2 h-4 w-4 text-amber-500" />
+                                Mark as Generated
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={invoice.status === 'sent'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'sent')}
+                              >
+                                <Send className="mr-2 h-4 w-4 text-blue-500" />
+                                Mark as Sent
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={invoice.status === 'paid'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'paid')}
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                                Mark as Paid
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                {/* Link uses job_id from the invoice record */}
+                                <Link href={`/dashboard/admin/invoices/${invoice.job_id}`}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         ) : (
           <div className="p-8 text-center">
             <p className="text-muted-foreground mb-4">No invoices found matching your criteria.</p>
@@ -422,14 +474,15 @@ export default function AdminInvoicesPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4">
-          <div className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+          <div className="text-sm text-muted-foreground text-center sm:text-left">
             Showing {Math.min(((currentPage - 1) * invoicesPerPage) + 1, totalInvoices)} to {Math.min(currentPage * invoicesPerPage, totalInvoices)} of {totalInvoices} invoices
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(1)}
               disabled={currentPage === 1}
             >
@@ -439,19 +492,21 @@ export default function AdminInvoicesPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Previous page</span>
             </Button>
-            {/* Simple page number display for brevity */}
-             <span className="text-sm font-medium">
-               Page {currentPage} of {totalPages}
-             </span>
+            {/* Simple page number display */}
+            <span className="text-sm font-medium">
+              {currentPage} / {totalPages}
+            </span>
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
@@ -461,6 +516,7 @@ export default function AdminInvoicesPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(totalPages)}
               disabled={currentPage === totalPages}
             >
@@ -474,7 +530,7 @@ export default function AdminInvoicesPage() {
       {/* Invoice details dialog */}
       {selectedInvoice && (
         <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
-          <DialogContent className="sm:max-w-[525px]">
+          <DialogContent className="max-w-[95vw] sm:max-w-[525px]">
             <DialogHeader>
               <DialogTitle>Invoice Details</DialogTitle>
               <DialogDescription>
@@ -482,21 +538,22 @@ export default function AdminInvoicesPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Invoice ID:</div>
-                <div className="col-span-3 text-xs text-muted-foreground">{selectedInvoice.id}</div>
+                <div className="col-span-2 sm:col-span-3 text-xs text-muted-foreground break-all">{selectedInvoice.id}</div>
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Job ID:</div>
-                <div className="col-span-3 text-xs text-muted-foreground">{selectedInvoice.job_id}</div>
-              </div>              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-3">{selectedInvoice.profiles?.company_name || 'N/A'}</div>
+                <div className="col-span-2 sm:col-span-3 text-xs text-muted-foreground break-all">{selectedInvoice.job_id}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
+                <div className="font-medium">Subcontractor:</div>
+                <div className="col-span-2 sm:col-span-3">{selectedInvoice.profiles?.company_name || 'N/A'}</div>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Job Desc:</div>
                 {/* Display job_type or fallback */}
-                <div className="col-span-3">{selectedInvoice.jobs?.job_type || 'N/A'}</div>
+                <div className="col-span-2 sm:col-span-3">{selectedInvoice.jobs?.job_type || 'N/A'}</div>
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Job Location:</div>

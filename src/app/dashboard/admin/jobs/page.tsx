@@ -231,90 +231,147 @@ export default function AdminJobsPage() {
             <p className="text-muted-foreground">Loading jobs...</p>
           </div>
         ) : jobs.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Job Type</TableHead>
-                <TableHead>Subcontractor</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Date Range</TableHead>
-                <TableHead className="text-right">Amount (RM)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-medium">{job.job_type}</TableCell>
-                  <TableCell>{job.profile?.company_name}</TableCell>
-                  <TableCell>{job.location}</TableCell>
-                  <TableCell>{formatDate(job.start_date)} - {formatDate(job.end_date)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(job.total)}</TableCell>
-                  <TableCell>
-                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      job.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                      job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' : 
-                      'bg-amber-100 text-amber-800'
-                    }`}>
-                      {job.status}
+          <>
+            <div className="md:hidden">
+              {/* Mobile card view */}
+              <div className="space-y-4 p-4">
+                {jobs.map((job) => (
+                  <div key={job.id} className="rounded-lg border p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-medium">{job.job_type}</h3>
+                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                        {job.status}
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Actions</span>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Subcontractor</p>
+                        <p>{job.profile?.company_name || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Location</p>
+                        <p>{job.location}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Date Range</p>
+                        <p>{formatDate(job.start_date)} - {formatDate(job.end_date)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Amount</p>
+                        <p className="font-medium">{formatCurrency(job.total)}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(job)}>
+                        Details
+                      </Button>
+                      {job.status === 'completed' && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/admin/invoices/${job.id}`}>
+                            <Download className="h-4 w-4 mr-1" /> Invoice
+                          </Link>
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleViewDetails(job)}>
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        <DropdownMenuItem 
-                          disabled={job.status === 'pending'}
-                          onClick={() => updateJobStatus(job.id, 'pending')}
-                        >
-                          <Clock className="mr-2 h-4 w-4 text-amber-500" />
-                          Set as Pending
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          disabled={job.status === 'in-progress'}
-                          onClick={() => updateJobStatus(job.id, 'in-progress')}
-                        >
-                          <FileText className="mr-2 h-4 w-4 text-blue-500" />
-                          Set as In Progress
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          disabled={job.status === 'completed'}
-                          onClick={() => updateJobStatus(job.id, 'completed')}
-                        >
-                          <CheckSquare className="mr-2 h-4 w-4 text-green-500" />
-                          Set as Completed
-                        </DropdownMenuItem>
-                        {job.status === 'completed' && (
-                          <>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Desktop table view */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job Type</TableHead>
+                    <TableHead>Subcontractor</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Date Range</TableHead>
+                    <TableHead className="text-right">Amount (RM)</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow key={job.id}>
+                      <TableCell className="font-medium">{job.job_type}</TableCell>
+                      <TableCell>{job.profile?.company_name}</TableCell>
+                      <TableCell>{job.location}</TableCell>
+                      <TableCell>{formatDate(job.start_date)} - {formatDate(job.end_date)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(job.total)}</TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {job.status}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/admin/invoices/${job.id}`}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Generate Invoice
-                              </Link>
+                            <DropdownMenuItem onClick={() => handleViewDetails(job)}>
+                              View Details
                             </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                            <DropdownMenuItem 
+                              disabled={job.status === 'pending'}
+                              onClick={() => updateJobStatus(job.id, 'pending')}
+                            >
+                              <Clock className="mr-2 h-4 w-4 text-amber-500" />
+                              Set as Pending
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              disabled={job.status === 'in-progress'}
+                              onClick={() => updateJobStatus(job.id, 'in-progress')}
+                            >
+                              <FileText className="mr-2 h-4 w-4 text-blue-500" />
+                              Set as In Progress
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              disabled={job.status === 'completed'}
+                              onClick={() => updateJobStatus(job.id, 'completed')}
+                            >
+                              <CheckSquare className="mr-2 h-4 w-4 text-green-500" />
+                              Set as Completed
+                            </DropdownMenuItem>
+                            {job.status === 'completed' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/dashboard/admin/invoices/${job.id}`}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Generate Invoice
+                                  </Link>
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         ) : (
           <div className="p-8 text-center">
             <p className="text-muted-foreground mb-4">No jobs found</p>
@@ -324,14 +381,15 @@ export default function AdminJobsPage() {
       
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+          <div className="text-sm text-muted-foreground text-center sm:text-left">
             Showing {((currentPage - 1) * jobsPerPage) + 1} to {Math.min(currentPage * jobsPerPage, totalJobs)} of {totalJobs} jobs
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(1)}
               disabled={currentPage === 1}
             >
@@ -341,13 +399,14 @@ export default function AdminJobsPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Previous page</span>
             </Button>
-            <div className="flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1">
               {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                 let pageNum = i + 1;
                 
@@ -367,6 +426,7 @@ export default function AdminJobsPage() {
                     key={pageNum}
                     variant={pageNum === currentPage ? "default" : "outline"}
                     size="icon"
+                    className="h-8 w-8"
                     onClick={() => handlePageChange(pageNum)}
                   >
                     {pageNum}
@@ -374,9 +434,15 @@ export default function AdminJobsPage() {
                 );
               })}
             </div>
+            <div className="sm:hidden">
+              <span className="text-sm font-medium">
+                {currentPage} / {totalPages}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
@@ -386,6 +452,7 @@ export default function AdminJobsPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(totalPages)}
               disabled={currentPage === totalPages}
             >
@@ -399,7 +466,7 @@ export default function AdminJobsPage() {
       {/* Job details dialog */}
       {selectedJob && (
         <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
-          <DialogContent className="sm:max-w-[525px]">
+          <DialogContent className="max-w-[95vw] sm:max-w-[525px]">
             <DialogHeader>
               <DialogTitle>Job Details</DialogTitle>
               <DialogDescription>
@@ -407,39 +474,39 @@ export default function AdminJobsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Job Type:</div>
-                <div className="col-span-3">{selectedJob.job_type}</div>
+                <div className="col-span-2 sm:col-span-3">{selectedJob.job_type}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-3">{selectedJob.profile?.company_name}</div>
+                <div className="col-span-2 sm:col-span-3">{selectedJob.profile?.company_name}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Location:</div>
-                <div className="col-span-3">{selectedJob.location}</div>
+                <div className="col-span-2 sm:col-span-3">{selectedJob.location}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Date Range:</div>
-                <div className="col-span-3">
+                <div className="col-span-2 sm:col-span-3">
                   {formatDate(selectedJob.start_date)} - {formatDate(selectedJob.end_date)}
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Unit:</div>
-                <div className="col-span-3">{selectedJob.unit}</div>
+                <div className="col-span-2 sm:col-span-3">{selectedJob.unit}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Unit Price:</div>
-                <div className="col-span-3">{formatCurrency(selectedJob.unit_price)}</div>
+                <div className="col-span-2 sm:col-span-3">{formatCurrency(selectedJob.unit_price)}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Total:</div>
-                <div className="col-span-3 font-bold">{formatCurrency(selectedJob.total)}</div>
+                <div className="col-span-2 sm:col-span-3 font-bold">{formatCurrency(selectedJob.total)}</div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Status:</div>
-                <div className="col-span-3">
+                <div className="col-span-2 sm:col-span-3">
                   <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     selectedJob.status === 'completed' ? 'bg-green-100 text-green-800' : 
                     selectedJob.status === 'in-progress' ? 'bg-blue-100 text-blue-800' : 
@@ -450,28 +517,28 @@ export default function AdminJobsPage() {
                 </div>
               </div>
               {selectedJob.notes && (
-                <div className="grid grid-cols-4 items-start gap-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 items-start gap-4">
                   <div className="font-medium">Notes:</div>
-                  <div className="col-span-3 whitespace-pre-wrap">{selectedJob.notes}</div>
+                  <div className="col-span-2 sm:col-span-3 whitespace-pre-wrap">{selectedJob.notes}</div>
                 </div>
               )}
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Submitted:</div>
-                <div className="col-span-3">{new Date(selectedJob.created_at).toLocaleString()}</div>
+                <div className="col-span-2 sm:col-span-3">{new Date(selectedJob.created_at).toLocaleString()}</div>
               </div>
             </div>
             <DialogFooter>
-              <div className="flex gap-2 justify-end w-full">
-                <div className="flex-1">
-                  {selectedJob.status === 'completed' && (
-                    <Button variant="outline" asChild className="w-full sm:w-auto">
-                      <Link href={`/dashboard/admin/invoices/${selectedJob.id}`}>
-                        <Download className="mr-2 h-4 w-4" /> Generate Invoice
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-                <Button variant="outline" onClick={() => setSelectedJob(null)}>Close</Button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-end w-full">
+                {selectedJob.status === 'completed' && (
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href={`/dashboard/admin/invoices/${selectedJob.id}`}>
+                      <Download className="mr-2 h-4 w-4" /> Generate Invoice
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setSelectedJob(null)} className="w-full sm:w-auto">
+                  Close
+                </Button>
               </div>
             </DialogFooter>
           </DialogContent>

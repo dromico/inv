@@ -274,50 +274,50 @@ export default function AdminSettingsPage() {
       </div>
       
       <div className="space-y-4">
-        <div className="flex space-x-2 border-b overflow-x-auto">
+        <div className="flex space-x-1 sm:space-x-2 border-b overflow-x-auto">
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'profile' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-3 sm:px-4 py-2 font-medium ${activeTab === 'profile' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('profile')}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <User className="h-4 w-4" />
-              <span>Profile</span>
+              <span className="text-xs sm:text-sm">Profile</span>
             </div>
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'system' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-3 sm:px-4 py-2 font-medium ${activeTab === 'system' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('system')}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Cog className="h-4 w-4" />
-              <span>System</span>
+              <span className="text-xs sm:text-sm">System</span>
             </div>
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'notifications' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-3 sm:px-4 py-2 font-medium ${activeTab === 'notifications' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('notifications')}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Bell className="h-4 w-4" />
-              <span>Notifications</span>
+              <span className="text-xs sm:text-sm">Alerts</span>
             </div>
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'security' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-3 sm:px-4 py-2 font-medium ${activeTab === 'security' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('security')}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Shield className="h-4 w-4" />
-              <span>Security</span>
+              <span className="text-xs sm:text-sm">Security</span>
             </div>
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeTab === 'invoice' ? 'border-b-2 border-primary' : ''}`}
+            className={`px-3 sm:px-4 py-2 font-medium ${activeTab === 'invoice' ? 'border-b-2 border-primary' : ''}`}
             onClick={() => setActiveTab('invoice')}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <FileText className="h-4 w-4" />
-              <span>Invoice</span>
+              <span className="text-xs sm:text-sm">Invoice</span>
             </div>
           </button>
         </div>
