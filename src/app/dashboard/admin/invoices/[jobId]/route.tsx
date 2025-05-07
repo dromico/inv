@@ -108,35 +108,50 @@ export async function GET(
 
     if (settingsError) {
       console.warn(`Error fetching invoice settings for job ${jobId}:`, settingsError);
-    }    const recipientText = settingsData?.setting_value || 'To Whom It May Concern,';    // Safely handle line items data with type assertions
-    // First get the raw array (or empty array if not present)
-    const rawLineItems: Json[] = lineItems && 
-      typeof lineItems === 'object' && 
-      'line_items' in lineItems && 
-      Array.isArray(lineItems.line_items) ? lineItems.line_items as Json[] : [];    // Convert to properly typed LineItem objects with type assertions, preserving exactly what the subcontractor entered
-    const processedLineItems: LineItem[] = rawLineItems.map(item => {
-      if (!item || typeof item !== 'object') {
-        return { unit_price: 0 };
+    }    const recipientText = settingsData?.setting_value || 'To Whom It May Concern,';    // Safely handle line items data with improved type handling
+    let processedLineItems: LineItem[] = [];
+    
+    try {
+      // Check if lineItems exists and has the expected structure
+      if (lineItems && typeof lineItems === 'object' && 'line_items' in lineItems) {
+        const items = lineItems.line_items;
+        
+        // Handle array case
+        if (Array.isArray(items)) {
+          processedLineItems = items.map(item => {
+            if (!item || typeof item !== 'object') {
+              return { unit_price: 0 };
+            }
+            
+            // Safely extract values
+            const itemObj = item as { [key: string]: any };
+            return {
+              description: typeof itemObj.description === 'string' ? itemObj.description : 
+                          (typeof itemObj.item_name === 'string' ? itemObj.item_name : 'Item'),
+              quantity: typeof itemObj.quantity === 'number' ? itemObj.quantity : 
+                       (typeof itemObj.unit_quantity === 'number' ? itemObj.unit_quantity : 1),
+              unit_price: typeof itemObj.unit_price === 'number' ? itemObj.unit_price : 0,
+              id: typeof itemObj.id === 'string' ? itemObj.id : undefined
+            };
+          });
+        } 
+        // Handle object case (single item)
+        else if (items && typeof items === 'object' && !Array.isArray(items)) {
+          const itemObj = items as { [key: string]: any };
+          processedLineItems = [{
+            description: typeof itemObj.description === 'string' ? itemObj.description : 
+                        (typeof itemObj.item_name === 'string' ? itemObj.item_name : 'Item'),
+            quantity: typeof itemObj.quantity === 'number' ? itemObj.quantity : 
+                     (typeof itemObj.unit_quantity === 'number' ? itemObj.unit_quantity : 1),
+            unit_price: typeof itemObj.unit_price === 'number' ? itemObj.unit_price : 0
+          }];
+        }
       }
-      
-      // Narrow down to object type (not null, not array, actual object)
-      if (Array.isArray(item) || item === null) {
-        return { unit_price: 0 };
-      }
-      
-      // Now we know item is an object type with string keys
-      const itemObj = item as { [key: string]: any };
-      
-      // Safely extract values with proper checks
-      return {
-        description: typeof itemObj.description !== 'undefined' ? String(itemObj.description) : undefined,
-        item_name: typeof itemObj.item_name !== 'undefined' ? String(itemObj.item_name) : undefined,
-        quantity: typeof itemObj.quantity !== 'undefined' ? Number(itemObj.quantity) : undefined,
-        unit_quantity: typeof itemObj.unit_quantity !== 'undefined' ? Number(itemObj.unit_quantity) : undefined,
-        unit_price: Number(itemObj.unit_price || 0),
-        id: typeof itemObj.id !== 'undefined' ? String(itemObj.id) : undefined
-      };
-    });
+    } catch (error) {
+      console.error('Error processing line items:', error);
+      // Fallback to empty array if there's an error
+      processedLineItems = [];
+    }
     
     const totalAmount = calculateTotalAmount(processedLineItems);
 

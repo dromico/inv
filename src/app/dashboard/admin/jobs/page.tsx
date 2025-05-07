@@ -150,17 +150,17 @@ export default function AdminJobsPage() {
     if (page > totalPages) page = totalPages
     setCurrentPage(page)
   }
-
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-MY')
   }
   
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null) => {
     return new Intl.NumberFormat('en-MY', {
       style: 'currency',
       currency: 'MYR',
       minimumFractionDigits: 2
-    }).format(amount)
+    }).format(amount || 0)
   }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,6 +1,6 @@
 import { format } from "date-fns"
 import { createServerComponentClient } from "@/lib/supabase-server"
-import { Invoice } from "@/types"
+import { Database } from "@/types/database"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -11,17 +11,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { FileText } from "lucide-react"
+import { FileText, CheckCircle, Send, Download } from "lucide-react"
+import Link from "next/link"
+
+// Define types based on the database schema
+type InvoiceRecord = Database['public']['Tables']['invoices']['Row']
+type JobRecord = Database['public']['Tables']['jobs']['Row']
+
+// Mark this page as dynamically rendered
+export const dynamic = 'force-dynamic';
+
+// Extended invoice type with job details
+interface InvoiceWithJob extends InvoiceRecord {
+  jobs: Pick<JobRecord, 'id' | 'job_type' | 'location' | 'status'> | null;
+}
 
 // Format currency as Malaysian Ringgit
-function formatCurrency(amount: number) {
+function formatCurrency(amount: number | null) {
+  if (amount === null) return 'N/A';
   return new Intl.NumberFormat('en-MY', {
     style: 'currency',
     currency: 'MYR',
@@ -30,15 +37,30 @@ function formatCurrency(amount: number) {
 }
 
 // Format date to a readable format
-function formatDate(dateString: string) {
-  return format(new Date(dateString), "PPP")
+function formatDate(dateString: string | null) {
+  if (!dateString) return 'N/A';
+  try {
+    return format(new Date(dateString), "PPP")
+  } catch (e) {
+    console.error("Error formatting date:", dateString, e);
+    return 'Invalid Date';
+  }
 }
 
 export default async function SubcontractorInvoicesPage() {
-  const supabase = createServerComponentClient()
+  console.log("InvoicesPage: Creating server component client")
+  const supabase = await createServerComponentClient()
   
   // Get the current user
-  const { data: { user } } = await supabase.auth.getUser()
+  console.log("InvoicesPage: Fetching user with server component client")
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  
+  console.log("InvoicesPage: Auth check result:", {
+    hasUser: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
+    error: userError ? JSON.stringify(userError) : null
+  })
   
   if (!user) {
     return (
@@ -47,7 +69,7 @@ export default async function SubcontractorInvoicesPage() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
             <p className="text-muted-foreground">
-              View and manage your invoices
+              View your invoices for completed jobs
             </p>
           </div>
         </div>
@@ -59,114 +81,166 @@ export default async function SubcontractorInvoicesPage() {
     )
   }
   
-  // Fetch invoices for the current user
-  // We need to join with jobs to get the subcontractor_id
-  const { data: invoices, error } = await supabase
-    .from('invoices')
-    .select(`
-      *,
-      job:jobs(subcontractor_id)
-    `)
-    .eq('job.subcontractor_id', user.id)
-    .order('issued_date', { ascending: false })
-  
-  // Handle loading state with skeleton UI
-  if (!invoices && !error) {
-    return <InvoicesLoadingSkeleton />
-  }
-  
-  // Handle error state
-  if (error) {
-    console.error('Error loading invoices:', error)
+  try {
+    // Fetch invoices for the current user's completed jobs only
+    console.log("Fetching invoices for user:", user.id);
+    
+    // First, get the jobs that belong to this subcontractor
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('subcontractor_id', user.id);
+      
+    if (jobsError) {
+      console.error('Error fetching jobs:', jobsError);
+      throw new Error(`Error fetching jobs: ${JSON.stringify(jobsError)}`);
+    }
+    
+    if (!jobs || jobs.length === 0) {
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
+              <p className="text-muted-foreground">
+                View your invoices for completed jobs
+              </p>
+            </div>
+          </div>
+          
+          <div className="rounded-md border p-8 text-center">
+            <p className="text-muted-foreground mb-4">You don't have any jobs yet.</p>
+          </div>
+        </div>
+      );
+    }
+    
+    // Get the job IDs
+    const jobIds = jobs.map((job: any) => job.id);
+    console.log("Found job IDs:", jobIds);
+    
+    // Now fetch invoices for these jobs
+    console.log("Fetching invoices for job IDs:", jobIds);
+    
+    // Try the query without ordering
+    console.log("Fetching invoices without ordering");
+    const { data: invoices, error: invoicesError } = await supabase
+      .from('invoices')
+      .select(`
+        *,
+        jobs (id, job_type, location, status)
+      `)
+      .in('job_id', jobIds);
+      
+    console.log("Invoices query result:", {
+      hasInvoices: !!invoices && invoices.length > 0,
+      count: invoices?.length,
+      error: invoicesError ? JSON.stringify(invoicesError) : null
+    });
+    
+    if (invoicesError) {
+      throw new Error(`Error fetching invoices: ${JSON.stringify(invoicesError)}`);
+    }
+    
+    // Handle loading state with skeleton UI
+    if (!invoices) {
+      return <InvoicesLoadingSkeleton />
+    }
+    
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
             <p className="text-muted-foreground">
-              View and manage your invoices
+              View your invoices for completed jobs
+            </p>
+          </div>
+        </div>
+        
+        <div className="rounded-md border">
+          {invoices.length > 0 && invoices.filter((invoice: any) => invoice.jobs?.status === 'completed').length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice Date</TableHead>
+                  <TableHead>Job Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoices
+                  .filter((invoice: any) => invoice.jobs?.status === 'completed')
+                  .map((invoice: InvoiceWithJob) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium">{formatDate(invoice.invoice_date)}</TableCell>
+                      <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                          invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {invoice.status === 'paid' && <CheckCircle className="mr-1 h-3 w-3" />}
+                          {invoice.status === 'sent' && <Send className="mr-1 h-3 w-3" />}
+                          {invoice.status === 'generated' && <FileText className="mr-1 h-3 w-3" />}
+                          {invoice.status || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/dashboard/subcontractor/invoices/${invoice.job_id}`}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              View
+                            </Link>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/dashboard/admin/invoices/${invoice.job_id}`} target="_blank">
+                              <Download className="mr-2 h-4 w-4" />
+                              PDF
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="p-8 text-center">
+              <p className="text-muted-foreground mb-4">You don&apos;t have any invoices for completed jobs yet.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  } catch (error) {
+    console.error('Error in SubcontractorInvoicesPage:', error instanceof Error ? error.message : JSON.stringify(error));
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
+            <p className="text-muted-foreground">
+              View your invoices for completed jobs
             </p>
           </div>
         </div>
         
         <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground mb-4">Failed to load invoices. Please try again later.</p>
+          <p className="text-sm text-red-500">
+            {error instanceof Error ? error.message : JSON.stringify(error)}
+          </p>
         </div>
       </div>
     )
   }
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
-          <p className="text-muted-foreground">
-            View and manage your invoices
-          </p>
-        </div>
-        <div className="w-full md:w-[180px]">
-          <Select defaultValue="all">
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="unpaid">Unpaid</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      
-      <div className="rounded-md border">
-        {invoices && invoices.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Issued Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map((invoice: Invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                  <TableCell>{formatDate(invoice.issued_date)}</TableCell>
-                  <TableCell>{formatDate(invoice.due_date)}</TableCell>
-                  <TableCell>
-                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                      invoice.status === 'overdue' ? 'bg-red-100 text-red-800' : 
-                      'bg-amber-100 text-amber-800'
-                    }`}>
-                      {invoice.status}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">{formatCurrency(invoice.amount)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm">
-                      <FileText className="mr-2 h-4 w-4" />
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="p-8 text-center">
-            <p className="text-muted-foreground mb-4">You don&apos;t have any invoices yet.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // Loading skeleton component
@@ -177,10 +251,9 @@ function InvoicesLoadingSkeleton() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
           <p className="text-muted-foreground">
-            View and manage your invoices
+            View your invoices for completed jobs
           </p>
         </div>
-        <Skeleton className="h-10 w-[180px]" />
       </div>
       
       <div className="rounded-md border">

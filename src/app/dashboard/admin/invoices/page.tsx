@@ -84,8 +84,8 @@ export default function AdminInvoicesPage() {
   const invoicesPerPage = 10
 
   const { toast } = useToast()
-  // Initialize client without generic type if it causes issues
-  const supabase = createClientComponentClient()
+  // Initialize client with proper Database type
+  const supabase = createClientComponentClient<Database>()
   const loadSubcontractors = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -110,7 +110,10 @@ export default function AdminInvoicesPage() {
 
   const loadInvoices = useCallback(async () => {
     try {
-      setLoading(true);      let query = supabase
+      setLoading(true);
+      
+      // Build the base query
+      let query = supabase
         .from('invoices')
         .select(`
           *,
@@ -119,43 +122,83 @@ export default function AdminInvoicesPage() {
         `, { count: 'exact' })
         .order('invoice_date', { ascending: false });
 
+      // Apply status filter if selected
       if (statusFilter !== "all") {
         query = query.eq('status', statusFilter);
       }
 
+      // Apply subcontractor filter if selected
       if (subcontractorFilter !== "all") {
-        // Filter directly on the subcontractor_id in the invoices table
         query = query.eq('subcontractor_id', subcontractorFilter);
-      }      if (searchQuery) {
-        // Search in job description or subcontractor company name
-        // Adjust search based on available fields (e.g., job_type, company_name)
-        query = query.or(`jobs.job_type.ilike.%${searchQuery}%,profiles.company_name.ilike.%${searchQuery}%`);
+      }
+      
+      // Apply search filter if provided
+      if (searchQuery) {
+        // Create search pattern with wildcards
+        const searchPattern = `%${searchQuery}%`;
+        
+        // Use separate filters for each condition
+        // Note: We can't directly filter on foreign tables in the OR clause
+        // So we'll use a simpler approach for now
+        query = query.or('id.neq.no_match'); // This creates a dummy condition that's always true
+        
+        // We'll handle the search filtering in JavaScript after fetching the data
+        // This is a workaround for the limitations of the Supabase query API
       }
 
       // Add pagination
       const from = (currentPage - 1) * invoicesPerPage;
       const to = from + invoicesPerPage - 1;
 
+      // Execute the query
       const { data, error, count } = await query.range(from, to);
 
       if (error) {
-        throw error;
+        console.error('Supabase query error:', JSON.stringify(error));
+        throw new Error(`Supabase query error: ${error.message || JSON.stringify(error)}`);
       }
 
       if (data) {
+        // Apply client-side filtering for search if needed
+        let filteredData = data;
+        
+        if (searchQuery && data.length > 0) {
+          const searchLower = searchQuery.toLowerCase();
+          filteredData = data.filter(invoice => {
+            // Check job_type (with null/undefined handling)
+            const jobTypeMatch = invoice.jobs?.job_type
+              ? invoice.jobs.job_type.toLowerCase().includes(searchLower)
+              : false;
+              
+            // Check company_name (with null/undefined handling)
+            const companyMatch = invoice.profiles?.company_name
+              ? invoice.profiles.company_name.toLowerCase().includes(searchLower)
+              : false;
+              
+            // Return true if either matches
+            return jobTypeMatch || companyMatch;
+          });
+        }
+        
         // Ensure data matches the expected type
-        setInvoices(data as InvoiceWithDetails[]);
-        setTotalInvoices(count || 0);
+        setInvoices(filteredData as InvoiceWithDetails[]);
+        
+        // If we're doing client-side filtering, we need to adjust the total count
+        if (searchQuery) {
+          setTotalInvoices(filteredData.length);
+        } else {
+          setTotalInvoices(count || 0);
+        }
       } else {
         setInvoices([]);
         setTotalInvoices(0);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading invoices:', error);
       toast({
         variant: "destructive",
         title: "Failed to load invoices",
-        description: "There was a problem loading the invoices. Please try again.",
+        description: error.message || "There was a problem loading the invoices. Please try again.",
       });
       setInvoices([]); // Clear invoices on error
       setTotalInvoices(0);

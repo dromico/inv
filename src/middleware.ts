@@ -7,7 +7,14 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient(req, res);
 
   // Check if session exists
+  console.log("Middleware: Checking session");
   const { data: { session } } = await supabase.auth.getSession();
+  
+  console.log("Middleware: Session check result:", {
+    hasSession: !!session,
+    userId: session?.user?.id,
+    userEmail: session?.user?.email
+  });
 
   // Get the pathname from the URL
   const { pathname } = req.nextUrl;

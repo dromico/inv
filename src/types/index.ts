@@ -14,15 +14,16 @@ export interface Job {
   subcontractor_id: string;
   job_type: string;
   location: string;
-  start_date: string;
-  end_date: string;
-  status: 'pending' | 'in-progress' | 'completed';
-  unit: number;
-  unit_price: number;
-  total: number;
+  start_date: string | null;
+  end_date: string | null;
+  status: 'pending' | 'in-progress' | 'completed' | null;
+  unit: number | null;
+  unit_price: number | null;
+  total: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string | null;
+  line_items?: any; // Using any for flexibility with different line item formats
 }
 
 export interface JobWithSubcontractor extends Job {

@@ -1,3 +1,4 @@
+// React PDF components are meant for server-side rendering, no "use client" directive needed
 import React from 'react'; // Required for JSX
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
@@ -108,15 +109,26 @@ export const InvoiceDocument = ({
 }) => {  // Determine header info based on availability
   const headerName = subcontractor?.company_name || 'Subcontractor';
   const headerAddress = subcontractor?.address || ''; // Assuming an 'address' field
+  
+  // Safely handle line_items which might be null, undefined, or not an array
+  const safeLineItems = Array.isArray(job?.line_items) 
+    ? job.line_items 
+    : (typeof job?.line_items === 'object' && job?.line_items !== null)
+      ? [job.line_items]
+      : [];
+
   // Calculate total amount from line items with proper type safety
-  const totalAmount = job?.line_items?.reduce(
+  const totalAmount = safeLineItems.reduce(
     (sum: number, item: LineItemType) => {
-      // Handle both quantity formats
-      const quantity = item.quantity ?? item.unit_quantity ?? 0;
-      return sum + (quantity * (item.unit_price || 0));
+      // Handle both quantity formats and ensure we have numbers
+      const quantity = typeof item?.quantity === 'number' 
+        ? item.quantity 
+        : (typeof item?.unit_quantity === 'number' ? item.unit_quantity : 0);
+      const unitPrice = typeof item?.unit_price === 'number' ? item.unit_price : 0;
+      return sum + (quantity * unitPrice);
     },
     0
-  ) || 0;
+  );
   
   return (
     <Document>
@@ -138,30 +150,36 @@ export const InvoiceDocument = ({
           <Text style={styles.detailItem}>Job ID: {job.id}</Text>
           <Text style={styles.detailItem}>Job Description: {job.description}</Text>
           {/* Add other relevant job details */}
-        </View>
-
-        {/* Line Items Table */}
+        </View>        {/* Line Items Table */}
         <View style={styles.lineItemsTable}>
           {/* Table Header */}
           <View style={styles.tableRow}>
             <Text style={styles.tableColHeader}>Description</Text>
             <Text style={styles.tableColHeader}>Quantity</Text>
             <Text style={styles.tableColHeader}>Unit Price</Text>
-            {/* Add more columns if needed */}
+            <Text style={styles.tableColHeader}>Amount</Text>
           </View>          {/* Table Body */}
-          {job?.line_items?.map((item: LineItemType, index: number) => (
-            <View style={styles.tableRow} key={index}>
-              <Text style={styles.tableCol}>{item.description || item.item_name || 'N/A'}</Text>
-              <Text style={styles.tableCol}>{item.quantity ?? item.unit_quantity ?? 0}</Text>
-              <Text style={styles.tableCol}>{(item.unit_price || 0).toFixed(2)}</Text>
-              {/* Add more columns if needed */}
-            </View>
-          ))}
-        </View>
-
-        {/* Total */}
+          {safeLineItems.map((item: LineItemType, index: number) => {
+            // Safely extract values with null/undefined checks
+            const description = item?.description || item?.item_name || 'N/A';
+            const quantity = typeof item?.quantity === 'number' 
+              ? item.quantity 
+              : (typeof item?.unit_quantity === 'number' ? item.unit_quantity : 0);
+            const unitPrice = typeof item?.unit_price === 'number' ? item.unit_price : 0;
+            const itemTotal = quantity * unitPrice;
+            
+            return (
+              <View style={styles.tableRow} key={index}>
+                <Text style={styles.tableCol}>{description}</Text>
+                <Text style={styles.tableCol}>{quantity}</Text>
+                <Text style={styles.tableCol}>{unitPrice.toFixed(2)}</Text>
+                <Text style={styles.tableCol}>{itemTotal.toFixed(2)}</Text>
+              </View>
+            );
+          })}
+        </View>        {/* Total */}
         <View style={styles.totalSection}>
-          <Text style={styles.totalText}>Total Amount: ${totalAmount.toFixed(2)}</Text>
+          <Text style={styles.totalText}>Total Amount: RM {totalAmount.toFixed(2)}</Text>
         </View>
 
       </Page>

@@ -121,75 +121,7 @@ function RecentActivityList() {
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
           .slice(0, 5)
         
-        // If we don't have enough real activities, add some realistic fallbacks
-        if (allActivities.length < 3) {
-          const fallbackActivities: Activity[] = [
-            {
-              id: 'fallback-1',
-              type: 'job',
-              title: 'Electrical Maintenance',
-              description: 'Commercial Building A',
-              status: 'pending',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
-              subcontractor: {
-                id: 'fallback-sub-1',
-                name: 'ABC Electrical Services'
-              }
-            },
-            {
-              id: 'fallback-2',
-              type: 'invoice',
-              title: 'Invoice #INV-2025-042',
-              description: 'Amount: RM 4,500.00',
-              status: 'unpaid',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(), // 8 hours ago
-              subcontractor: {
-                id: 'fallback-sub-2',
-                name: 'XYZ Contractors'
-              }
-            },
-            {
-              id: 'fallback-3',
-              type: 'job',
-              title: 'Plumbing Installation',
-              description: 'Residential Complex B',
-              status: 'in-progress',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-              subcontractor: {
-                id: 'fallback-sub-3',
-                name: 'Delta Plumbing Co.'
-              }
-            },
-            {
-              id: 'fallback-4',
-              type: 'invoice',
-              title: 'Invoice #INV-2025-039',
-              description: 'Amount: RM 7,850.00',
-              status: 'paid',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(), // 36 hours ago
-              subcontractor: {
-                id: 'fallback-sub-4',
-                name: 'Omega Construction'
-              }
-            },
-            {
-              id: 'fallback-5',
-              type: 'job',
-              title: 'Interior Renovation',
-              description: 'Office Building C',
-              status: 'completed',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
-              subcontractor: {
-                id: 'fallback-sub-5',
-                name: 'Prime Interiors'
-              }
-            }
-          ];
-          
-          // Only add enough fallbacks to reach 5 total activities
-          const neededFallbacks = Math.min(5 - allActivities.length, fallbackActivities.length);
-          allActivities = [...allActivities, ...fallbackActivities.slice(0, neededFallbacks)];
-        }
+        // Display only real activities, no fallbacks
         
         setActivities(allActivities)      } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
