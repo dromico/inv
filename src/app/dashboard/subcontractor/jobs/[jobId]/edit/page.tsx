@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -73,7 +73,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
       try {
         setIsLoading(true)
         const { data: { user } } = await supabase.auth.getUser()
-        
+
         if (!user) {
           toast({
             variant: "destructive",
@@ -83,18 +83,18 @@ export default function EditJobPage({ params }: EditJobPageProps) {
           router.push('/auth/login')
           return
         }
-        
+
         const { data: jobData, error } = await supabase
           .from('jobs')
           .select('*')
           .eq('id', params.jobId)
           .eq('subcontractor_id', user.id)
           .single()
-        
+
         if (error) {
           throw error
         }
-        
+
         if (!jobData) {
           setError("Job not found or you don't have permission to edit it.")
           return
@@ -105,14 +105,14 @@ export default function EditJobPage({ params }: EditJobPageProps) {
           setError("Only jobs with 'pending' status can be edited.")
           return
         }
-        
+
         // Parse dates
         const startDate = new Date(jobData.start_date)
         const endDate = new Date(jobData.end_date)
-        
+
         // Parse line items
         let lineItems = jobData.line_items || []
-        
+
         // If line_items is empty or not an array, create a default line item from legacy fields
         if (!Array.isArray(lineItems) || lineItems.length === 0) {
           lineItems = [{
@@ -121,7 +121,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
             unit_price: jobData.unit_price
           }]
         }
-        
+
         // Set form values
         form.reset({
           location: jobData.location,
@@ -137,21 +137,21 @@ export default function EditJobPage({ params }: EditJobPageProps) {
         setIsLoading(false)
       }
     }
-    
+
     fetchJob()
   }, [params.jobId, router, supabase, toast, form])
 
   async function onSubmit(data: FormValues) {
     try {
       setIsSubmitting(true)
-      
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         throw new Error("You must be logged in to update a job")
       }
-      
+
       // Verify job is still pending
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
@@ -159,25 +159,25 @@ export default function EditJobPage({ params }: EditJobPageProps) {
         .eq('id', params.jobId)
         .eq('subcontractor_id', user.id)
         .single()
-      
+
       if (jobError) {
         throw jobError
       }
-      
+
       if (!jobData) {
         throw new Error("Job not found or you don't have permission to edit it")
       }
-      
+
       if (jobData.status !== 'pending') {
         throw new Error("This job can no longer be edited as its status has changed")
       }
-      
+
       // Calculate grand total from all line items
       const lineItemsWithTotals = data.line_items.map(item => ({
         ...item,
         total: item.unit_quantity * item.unit_price
       }))
-      
+
       // Prepare data for update
       const updateData = {
         job_type: data.line_items[0].item_name, // Use first line item as main job type for backward compatibility
@@ -199,14 +199,14 @@ export default function EditJobPage({ params }: EditJobPageProps) {
         .eq('id', params.jobId)
         .eq('subcontractor_id', user.id)
         .eq('status', 'pending'); // Extra safeguard to ensure only pending jobs are updated
-      
+
       if (error) throw error
-      
+
       toast({
         title: "Job Updated",
         description: "Your job has been updated successfully.",
       })
-      
+
       // Redirect to job details page
       router.push(`/dashboard/subcontractor/jobs/${params.jobId}`)
     } catch (error: any) {
@@ -223,13 +223,13 @@ export default function EditJobPage({ params }: EditJobPageProps) {
 
   // Calculate line item totals and grand total
   const lineItems = form.watch("line_items") || []
-  
+
   const lineItemTotals = lineItems.map(item => {
     const quantity = item.unit_quantity || 0
     const price = item.unit_price || 0
     return quantity * price
   })
-  
+
   const grandTotal = lineItemTotals.reduce((sum, total) => sum + total, 0)
 
   const formatCurrency = (amount: number) => {
@@ -266,7 +266,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
             <h2 className="text-3xl font-bold tracking-tight">Edit Job</h2>
           </div>
         </div>
-        
+
         <div className="flex flex-col items-center justify-center p-8 border rounded-md">
           <AlertCircle className="h-8 w-8 text-destructive mb-4" />
           <h3 className="text-xl font-semibold mb-2">Error</h3>
@@ -298,7 +298,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
           </p>
         </div>
       </div>
-      
+
       <Card className="border-primary/20 shadow-md">
         <CardHeader className="bg-muted/30">
           <CardTitle>Job Details</CardTitle>
@@ -326,7 +326,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                   </FormItem>
                 )}
               />
-              
+
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 bg-muted/20 p-4 rounded-lg border border-muted">
                 <FormField
                   control={form.control}
@@ -371,7 +371,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                   )}
                 />
               </div>
-              
+
               <div className="space-y-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium">Line Items</h3>
@@ -387,7 +387,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                     Add Item
                   </Button>
                 </div>
-                
+
                 {fields.map((field, index) => (
                   <div
                     key={field.id}
@@ -412,7 +412,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                         </Button>
                       )}
                     </div>
-                    
+
                     <FormField
                       control={form.control}
                       name={`line_items.${index}.item_name`}
@@ -430,7 +430,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                       <FormField
                         control={form.control}
@@ -481,7 +481,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                         )}
                       />
                     </div>
-                    
+
                     <div className="bg-muted p-4 rounded-md shadow-inner">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Item Total:</span>
@@ -493,11 +493,11 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                   </div>
                 ))}
               </div>
-              
+
               <div className="mt-8 border-t pt-6">
                 <div className="bg-primary/5 p-5 rounded-lg shadow-sm border border-primary/20">
                   <h3 className="text-lg font-semibold mb-3">Order Summary</h3>
-                  
+
                   {/* Line items summary */}
                   <div className="space-y-2 mb-4">
                     {lineItems.map((item, index) => (
@@ -507,10 +507,10 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Divider */}
                   <div className="border-t border-primary/20 my-3"></div>
-                  
+
                   {/* Grand total */}
                   <div className="flex justify-between items-center">
                     <span className="font-medium">Grand Total:</span>
@@ -521,7 +521,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                   </p>
                 </div>
               </div>
-              
+
               <FormField
                 control={form.control}
                 name="notes"

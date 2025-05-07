@@ -2,6 +2,7 @@
 
 import { UserNav } from "@/components/user-nav"
 import { DashboardNav } from "@/components/dashboard-nav"
+import { SubcontractorMobileNav } from "@/components/subcontractor-mobile-nav"
 
 export default function SubcontractorDashboardLayout({
   children
@@ -12,8 +13,9 @@ export default function SubcontractorDashboardLayout({
     <div className="flex min-h-screen flex-col">
       <div className="border-b">
         <div className="flex h-16 items-center px-4">
-          <h1 className="text-lg font-bold">Subcontractor Portal</h1>
-          
+          <SubcontractorMobileNav />
+          <h1 className="text-lg font-bold ml-2 md:ml-0">Subcontractor Portal</h1>
+
           <div className="ml-auto flex items-center space-x-4">
             <UserNav />
           </div>

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import { AlertCircle, ArrowLeft, FileText, Loader2, Pencil, Trash2 } from "lucide-react"
+import { JobHistory } from "@/components/job-history"
 import {
   Dialog,
   DialogContent,
@@ -31,17 +32,17 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
   const [loading, setLoading] = useState(true)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  
+
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClientComponentClient()
-  
+
   useEffect(() => {
     async function fetchJob() {
       try {
         setLoading(true)
         const { data: { user } } = await supabase.auth.getUser()
-        
+
         if (!user) {
           toast({
             variant: "destructive",
@@ -51,18 +52,18 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
           router.push('/auth/login')
           return
         }
-        
+
         const { data: jobData, error } = await supabase
           .from('jobs')
           .select('*')
           .eq('id', params.jobId)
           .eq('subcontractor_id', user.id)
           .single()
-        
+
         if (error) {
           throw error
         }
-        
+
         if (!jobData) {
           toast({
             variant: "destructive",
@@ -72,7 +73,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
           router.push('/dashboard/subcontractor/jobs')
           return
         }
-        
+
         setJob(jobData as Job)
       } catch (error) {
         console.error('Error fetching job:', error)
@@ -85,16 +86,16 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
         setLoading(false)
       }
     }
-    
+
     fetchJob()
   }, [params.jobId, router, supabase, toast])
 
   const handleDelete = async () => {
     try {
       if (!job) return
-      
+
       setIsDeleting(true)
-      
+
       if (job.status !== 'pending') {
         toast({
           variant: "destructive",
@@ -103,21 +104,21 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
         })
         return
       }
-      
+
       const { error } = await supabase
         .from('jobs')
         .delete()
         .eq('id', job.id)
-      
+
       if (error) {
         throw error
       }
-      
+
       toast({
         title: "Job deleted",
         description: "The job has been deleted successfully.",
       })
-      
+
       router.push('/dashboard/subcontractor/jobs')
     } catch (error) {
       console.error('Error deleting job:', error)
@@ -131,8 +132,10 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
       setIsDeleteDialogOpen(false)
     }
   }
-  
-  const getStatusBadgeClass = (status: string) => {
+
+  const getStatusBadgeClass = (status: string | null) => {
+    if (!status) return 'bg-gray-100 text-gray-800 border-gray-200'
+
     switch (status) {
       case 'pending':
         return 'bg-amber-100 text-amber-800 border-amber-200'
@@ -170,9 +173,9 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="mr-2"
           onClick={() => router.back()}
         >
@@ -186,7 +189,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
           </p>
         </div>
       </div>
-      
+
       <div className="grid gap-6">
         <Card>
           <CardHeader className="flex flex-row items-start justify-between">
@@ -194,11 +197,11 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               <CardTitle className="text-2xl">{job.job_type}</CardTitle>
               <div className="flex items-center mt-1">
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(job.status)}`}>
-                  {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                  {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               {job.status === 'pending' && (
                 <>
@@ -207,8 +210,8 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                       <Pencil className="h-4 w-4 mr-2" /> Edit
                     </Link>
                   </Button>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     size="sm"
                     onClick={() => setIsDeleteDialogOpen(true)}
                   >
@@ -216,7 +219,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                   </Button>
                 </>
               )}
-              
+
               {job.status === 'completed' && (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/dashboard/subcontractor/invoices/${job.id}`}>
@@ -226,7 +229,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               )}
             </div>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -243,7 +246,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                   <p>{formatDate(job.created_at)}</p>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <h3 className="font-medium text-sm text-muted-foreground">Units</h3>
@@ -259,7 +262,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                 </div>
               </div>
             </div>
-            
+
             {job.notes && (
               <div>
                 <h3 className="font-medium text-sm text-muted-foreground mb-2">Notes</h3>
@@ -269,15 +272,18 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               </div>
             )}
           </CardContent>
-          
+
           <CardFooter>
             <p className="text-xs text-muted-foreground">
               Job ID: {job.id}
             </p>
           </CardFooter>
         </Card>
+
+        {/* Job History */}
+        <JobHistory jobId={job.id} />
       </div>
-      
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
