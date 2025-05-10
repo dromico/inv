@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClientComponentClient } from "@/lib/supabase"
@@ -22,9 +22,9 @@ import {
 } from "@/components/ui/dialog"
 
 interface JobDetailsPageProps {
-  params: {
+  params: Promise<{
     jobId: string
-  }
+  }>
 }
 
 export default function JobDetailsPage({ params }: JobDetailsPageProps) {
@@ -36,6 +36,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClientComponentClient()
+  const { jobId } = use(params)
 
   useEffect(() => {
     async function fetchJob() {
@@ -56,7 +57,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
         const { data: jobData, error } = await supabase
           .from('jobs')
           .select('*')
-          .eq('id', params.jobId)
+          .eq('id', jobId)
           .eq('subcontractor_id', user.id)
           .single()
 
@@ -88,7 +89,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
     }
 
     fetchJob()
-  }, [params.jobId, router, supabase, toast])
+  }, [jobId, router, supabase, toast])
 
   const handleDelete = async () => {
     try {

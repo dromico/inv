@@ -30,9 +30,9 @@ type FormValues = z.infer<typeof jobSchema>
 type LineItem = z.infer<typeof lineItemSchema> & { total?: number }
 
 interface EditJobPageProps {
-  params: {
+  params: Promise<{
     jobId: string
-  }
+  }>
 }
 
 export default function EditJobPage({ params }: EditJobPageProps) {
@@ -42,6 +42,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClientComponentClient()
+  const { jobId } = use(params)
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -87,7 +88,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
         const { data: jobData, error } = await supabase
           .from('jobs')
           .select('*')
-          .eq('id', params.jobId)
+          .eq('id', jobId)
           .eq('subcontractor_id', user.id)
           .single()
 
@@ -139,7 +140,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
     }
 
     fetchJob()
-  }, [params.jobId, router, supabase, toast, form])
+  }, [jobId, router, supabase, toast, form])
 
   async function onSubmit(data: FormValues) {
     try {
@@ -156,7 +157,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
         .select('status')
-        .eq('id', params.jobId)
+        .eq('id', jobId)
         .eq('subcontractor_id', user.id)
         .single()
 
@@ -196,7 +197,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
       const { error } = await supabase
         .from('jobs')
         .update(updateData)
-        .eq('id', params.jobId)
+        .eq('id', jobId)
         .eq('subcontractor_id', user.id)
         .eq('status', 'pending'); // Extra safeguard to ensure only pending jobs are updated
 
@@ -208,7 +209,7 @@ export default function EditJobPage({ params }: EditJobPageProps) {
       })
 
       // Redirect to job details page
-      router.push(`/dashboard/subcontractor/jobs/${params.jobId}`)
+      router.push(`/dashboard/subcontractor/jobs/${jobId}`)
     } catch (error: any) {
       console.error('Error updating job:', error);
       toast({
