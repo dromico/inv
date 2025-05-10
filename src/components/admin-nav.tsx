@@ -52,7 +52,7 @@ const navItems = [
   },
 ]
 
-export function AdminNav() {
+export function AdminNav({ onNavItemClick }: { onNavItemClick?: () => void }) {
   const pathname = usePathname()
 
   return (
@@ -61,6 +61,7 @@ export function AdminNav() {
         <Link
           key={item.href}
           href={item.href}
+          onClick={onNavItemClick}
         >
           <span
             className={cn(

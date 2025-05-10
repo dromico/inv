@@ -15,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
-  DropdownMenu, 
+import {
+  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -60,7 +60,7 @@ export default function AdminJobsPage() {
   const [totalJobs, setTotalJobs] = useState(0)
   const [selectedJob, setSelectedJob] = useState<JobWithSubcontractor | null>(null)
   const jobsPerPage = 10
-  
+
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
@@ -72,7 +72,7 @@ export default function AdminJobsPage() {
   const loadJobs = async () => {
     try {
       setLoading(true)
-      
+
       let query = supabase
         .from('jobs')
         .select(`
@@ -80,26 +80,26 @@ export default function AdminJobsPage() {
           profile:profiles(*)
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
-      
+
       if (statusFilter !== "all") {
         query = query.eq('status', statusFilter)
       }
-      
+
       if (searchQuery) {
         query = query.or(`job_type.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`)
       }
-      
+
       // Add pagination
       const from = (currentPage - 1) * jobsPerPage
       const to = from + jobsPerPage - 1
-      
+
       const { data, error, count } = await query
         .range(from, to)
-      
+
       if (error) {
         throw error
       }
-      
+
       if (data) {
         setJobs(data as unknown as JobWithSubcontractor[])
         setTotalJobs(count || 0)
@@ -122,16 +122,16 @@ export default function AdminJobsPage() {
         .from('jobs')
         .update({ status })
         .eq('id', jobId)
-      
+
       if (error) {
         throw error
       }
-      
+
       toast({
         title: "Status updated",
         description: `Job status updated to ${status}`,
       })
-      
+
       loadJobs()
     } catch (error) {
       console.error('Error updating job status:', error)
@@ -154,7 +154,7 @@ export default function AdminJobsPage() {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-MY')
   }
-  
+
   const formatCurrency = (amount: number | null) => {
     return new Intl.NumberFormat('en-MY', {
       style: 'currency',
@@ -185,24 +185,24 @@ export default function AdminJobsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Manage Jobs</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Manage Jobs</h2>
+        <p className="text-sm md:text-base text-muted-foreground">
           View and manage all subcontractor jobs
         </p>
       </div>
-      
-      <div className="flex flex-col md:flex-row gap-4 items-end">
+
+      <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-end">
         <div className="flex-1">
           <form onSubmit={handleSearchSubmit} className="flex w-full max-w-sm items-center space-x-2">
             <Input
               type="search"
               placeholder="Search jobs or locations..."
-              className="flex-1"
+              className="flex-1 h-8 md:h-10 text-xs md:text-sm"
               value={searchQuery}
               onChange={handleSearchChange}
             />
-            <Button type="submit" size="icon">
-              <Search className="h-4 w-4" />
+            <Button type="submit" size="icon" className="h-8 w-8 md:h-10 md:w-10">
+              <Search className="h-3.5 w-3.5 md:h-4 md:w-4" />
               <span className="sr-only">Search</span>
             </Button>
           </form>
@@ -212,7 +212,7 @@ export default function AdminJobsPage() {
             value={statusFilter}
             onValueChange={handleStatusFilterChange}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -224,7 +224,7 @@ export default function AdminJobsPage() {
           </Select>
         </div>
       </div>
-      
+
       <div className="rounded-md border">
         {loading ? (
           <div className="p-8 text-center">
@@ -234,12 +234,12 @@ export default function AdminJobsPage() {
           <>
             <div className="md:hidden">
               {/* Mobile card view */}
-              <div className="space-y-4 p-4">
+              <div className="space-y-2 p-2">
                 {jobs.map((job) => (
-                  <div key={job.id} className="rounded-lg border p-4 space-y-3">
+                  <div key={job.id} className="rounded-lg border p-3 space-y-2">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-medium">{job.job_type}</h3>
-                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      <h3 className="font-medium text-sm">{job.job_type}</h3>
+                      <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         job.status === 'completed' ? 'bg-green-100 text-green-800' :
                         job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
                         'bg-amber-100 text-amber-800'
@@ -247,34 +247,29 @@ export default function AdminJobsPage() {
                         {job.status}
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Subcontractor</p>
-                        <p>{job.profile?.company_name || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Location</p>
-                        <p>{job.location}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Date Range</p>
-                        <p>{formatDate(job.start_date)} - {formatDate(job.end_date)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Amount</p>
-                        <p className="font-medium">{formatCurrency(job.total)}</p>
-                      </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div className="text-muted-foreground">Subcontractor:</div>
+                      <div>{job.profile?.company_name || "—"}</div>
+
+                      <div className="text-muted-foreground">Location:</div>
+                      <div>{job.location}</div>
+
+                      <div className="text-muted-foreground">Date Range:</div>
+                      <div>{formatDate(job.start_date)} - {formatDate(job.end_date)}</div>
+
+                      <div className="text-muted-foreground">Amount:</div>
+                      <div className="font-medium">{formatCurrency(job.total)}</div>
                     </div>
-                    
+
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(job)}>
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleViewDetails(job)}>
                         Details
                       </Button>
                       {job.status === 'completed' && (
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" className="h-7 text-xs px-2" asChild>
                           <Link href={`/dashboard/admin/invoices/${job.id}`}>
-                            <Download className="h-4 w-4 mr-1" /> Invoice
+                            <Download className="h-3 w-3 mr-1" /> Invoice
                           </Link>
                         </Button>
                       )}
@@ -283,7 +278,7 @@ export default function AdminJobsPage() {
                 ))}
               </div>
             </div>
-            
+
             {/* Desktop table view */}
             <div className="hidden md:block">
               <Table>
@@ -331,21 +326,21 @@ export default function AdminJobsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               disabled={job.status === 'pending'}
                               onClick={() => updateJobStatus(job.id, 'pending')}
                             >
                               <Clock className="mr-2 h-4 w-4 text-amber-500" />
                               Set as Pending
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               disabled={job.status === 'in-progress'}
                               onClick={() => updateJobStatus(job.id, 'in-progress')}
                             >
                               <FileText className="mr-2 h-4 w-4 text-blue-500" />
                               Set as In Progress
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               disabled={job.status === 'completed'}
                               onClick={() => updateJobStatus(job.id, 'completed')}
                             >
@@ -378,7 +373,7 @@ export default function AdminJobsPage() {
           </div>
         )}
       </div>
-      
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
@@ -409,7 +404,7 @@ export default function AdminJobsPage() {
             <div className="hidden sm:flex items-center gap-1">
               {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                 let pageNum = i + 1;
-                
+
                 // Show pages around current page if there are many pages
                 if (totalPages > 5) {
                   if (currentPage <= 3) {
@@ -420,7 +415,7 @@ export default function AdminJobsPage() {
                     pageNum = currentPage - 2 + i;
                   }
                 }
-                
+
                 return (
                   <Button
                     key={pageNum}
@@ -462,7 +457,7 @@ export default function AdminJobsPage() {
           </div>
         </div>
       )}
-      
+
       {/* Job details dialog */}
       {selectedJob && (
         <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
@@ -508,8 +503,8 @@ export default function AdminJobsPage() {
                 <div className="font-medium">Status:</div>
                 <div className="col-span-2 sm:col-span-3">
                   <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    selectedJob.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                    selectedJob.status === 'in-progress' ? 'bg-blue-100 text-blue-800' : 
+                    selectedJob.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    selectedJob.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
                     'bg-amber-100 text-amber-800'
                   }`}>
                     {selectedJob.status}

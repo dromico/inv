@@ -15,6 +15,10 @@ import { AdminNav } from "@/components/admin-nav"
 export function MobileNav() {
   const [open, setOpen] = useState(false)
 
+  const handleNavItemClick = () => {
+    setOpen(false)
+  }
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -28,7 +32,7 @@ export function MobileNav() {
           <SheetTitle>Admin Dashboard</SheetTitle>
         </SheetHeader>
         <div className="py-4">
-          <AdminNav />
+          <AdminNav onNavItemClick={handleNavItemClick} />
         </div>
       </SheetContent>
     </Sheet>

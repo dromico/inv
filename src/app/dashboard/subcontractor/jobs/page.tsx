@@ -184,14 +184,14 @@ export default async function JobsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Jobs</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Jobs</h2>
+          <p className="text-sm md:text-base text-muted-foreground">
             Manage your job submissions
           </p>
         </div>
-        <Button asChild>
+        <Button size="sm" className="md:h-10" asChild>
           <Link href="/dashboard/subcontractor/jobs/new">
             <Plus className="mr-2 h-4 w-4" /> New Job
           </Link>
@@ -203,53 +203,104 @@ export default async function JobsPage() {
 
       <div className="rounded-md border">
         {jobs && jobs.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Job Type</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-medium">{job.job_type}</TableCell>
-                  <TableCell>{job.location}</TableCell>
-                  <TableCell>{formatDate(job.start_date)}</TableCell>
-                  <TableCell>{formatDate(job.end_date)}</TableCell>
-                  <TableCell>
-                    {job.status ? (
-                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        job.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-amber-100 text-amber-800'
-                      }`}>
-                        {job.status}
-                      </div>
-                    ) : (
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Undefined                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(calculateTotalAmount(job))}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/subcontractor/jobs/${job.id}`}>
-                        View
-                      </Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <>
+            {/* Mobile view - card layout */}
+            <div className="md:hidden">
+              <div className="space-y-2 p-2">
+                {jobs.map((job) => (
+                  <div key={job.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-medium text-sm">{job.job_type}</h3>
+                      {job.status ? (
+                        <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {job.status}
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Undefined
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div className="text-muted-foreground">Location:</div>
+                      <div>{job.location}</div>
+
+                      <div className="text-muted-foreground">Date:</div>
+                      <div>{formatDate(job.start_date)} - {formatDate(job.end_date)}</div>
+
+                      <div className="text-muted-foreground">Total:</div>
+                      <div className="font-medium">{formatCurrency(calculateTotalAmount(job))}</div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" asChild>
+                        <Link href={`/dashboard/subcontractor/jobs/${job.id}`}>
+                          View Details
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Desktop view - table layout */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job Type</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow key={job.id}>
+                      <TableCell className="font-medium">{job.job_type}</TableCell>
+                      <TableCell>{job.location}</TableCell>
+                      <TableCell>{formatDate(job.start_date)}</TableCell>
+                      <TableCell>{formatDate(job.end_date)}</TableCell>
+                      <TableCell>
+                        {job.status ? (
+                          <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                            'bg-amber-100 text-amber-800'
+                          }`}>
+                            {job.status}
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Undefined
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(calculateTotalAmount(job))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/subcontractor/jobs/${job.id}`}>
+                            View
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         ) : (
           <div className="p-8 text-center">
             <p className="text-muted-foreground mb-4">No jobs found</p>

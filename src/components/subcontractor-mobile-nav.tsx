@@ -15,6 +15,10 @@ import { DashboardNav } from "@/components/dashboard-nav"
 export function SubcontractorMobileNav() {
   const [open, setOpen] = useState(false)
 
+  const handleNavItemClick = () => {
+    setOpen(false)
+  }
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -28,7 +32,7 @@ export function SubcontractorMobileNav() {
           <SheetTitle>Subcontractor Portal</SheetTitle>
         </SheetHeader>
         <div className="py-4">
-          <DashboardNav />
+          <DashboardNav onNavItemClick={handleNavItemClick} />
         </div>
       </SheetContent>
     </Sheet>
