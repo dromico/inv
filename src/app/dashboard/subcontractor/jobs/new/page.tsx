@@ -62,25 +62,25 @@ export default function NewJobPage() {
   async function onSubmit(data: FormValues) {
     try {
       setIsSubmitting(true)
-      
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         throw new Error("You must be logged in to create a job")
       }
-      
+
       // Calculate grand total from all line items
       const lineItemsWithTotals = data.line_items.map(item => ({
         ...item,
         total: item.unit_quantity * item.unit_price
       }))
-      
+
       const grandTotal = lineItemsWithTotals.reduce(
         (sum, item) => sum + (item.unit_quantity * item.unit_price),
         0
       )
-      
+
       // Prepare data for insertion
       const insertData = {
         subcontractor_id: user.id,
@@ -101,14 +101,14 @@ export default function NewJobPage() {
       const { error } = await supabase
         .from('jobs')
         .insert(insertData); // Use the prepared data object
-      
+
       if (error) throw error
-      
+
       toast({
         title: "Job Created",
         description: "Your job has been submitted successfully.",
       })
-      
+
       // Redirect with success parameter to show persistent feedback
       router.push('/dashboard/subcontractor/jobs') // Redirect to main jobs list on success
     } catch (error: any) {
@@ -126,13 +126,13 @@ export default function NewJobPage() {
 
   // Calculate line item totals and grand total
   const lineItems = form.watch("line_items") || []
-  
+
   const lineItemTotals = lineItems.map(item => {
     const quantity = item.unit_quantity || 0
     const price = item.unit_price || 0
     return quantity * price
   })
-  
+
   const grandTotal = lineItemTotals.reduce((sum, total) => sum + total, 0)
 
   const formatCurrency = (amount: number) => {
@@ -162,7 +162,7 @@ export default function NewJobPage() {
           </p>
         </div>
       </div>
-      
+
       <Card className="border-primary/20 shadow-md">
         <CardHeader className="bg-muted/30">
           <CardTitle>Job Details</CardTitle>
@@ -190,7 +190,7 @@ export default function NewJobPage() {
                   </FormItem>
                 )}
               />
-              
+
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 bg-muted/20 p-4 rounded-lg border border-muted">
                 <FormField
                   control={form.control}
@@ -213,29 +213,31 @@ export default function NewJobPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="end_date"
-                  render={({ field }) => (
-                    <FormItem className="bg-card p-3 rounded-md shadow-sm">
-                      <FormLabel className="text-sm font-medium">End Date</FormLabel>
-                      <FormControl>
-                        <DatePicker
-                          date={field.value}
-                          setDate={field.onChange}
-                          disabled={isSubmitting}
-                          className="border-primary/20 focus-within:ring-1 focus-within:ring-primary/30"
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs mt-1">
-                        When the job will be completed
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {form.watch("start_date") && (
+                  <FormField
+                    control={form.control}
+                    name="end_date"
+                    render={({ field }) => (
+                      <FormItem className="bg-card p-3 rounded-md shadow-sm">
+                        <FormLabel className="text-sm font-medium">End Date</FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            date={field.value}
+                            setDate={field.onChange}
+                            disabled={isSubmitting}
+                            className="border-primary/20 focus-within:ring-1 focus-within:ring-primary/30"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs mt-1">
+                          When the job will be completed
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
-              
+
               <div className="space-y-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium">Line Items</h3>
@@ -251,7 +253,7 @@ export default function NewJobPage() {
                     Add Item
                   </Button>
                 </div>
-                
+
                 {fields.map((field, index) => (
                   <div
                     key={field.id}
@@ -276,7 +278,7 @@ export default function NewJobPage() {
                         </Button>
                       )}
                     </div>
-                    
+
                     <FormField
                       control={form.control}
                       name={`line_items.${index}.item_name`}
@@ -294,7 +296,7 @@ export default function NewJobPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                       <FormField
                         control={form.control}
@@ -345,7 +347,7 @@ export default function NewJobPage() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="bg-muted p-4 rounded-md shadow-inner">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Item Total:</span>
@@ -357,11 +359,11 @@ export default function NewJobPage() {
                   </div>
                 ))}
               </div>
-              
+
               <div className="mt-8 border-t pt-6">
                 <div className="bg-primary/5 p-5 rounded-lg shadow-sm border border-primary/20">
                   <h3 className="text-lg font-semibold mb-3">Order Summary</h3>
-                  
+
                   {/* Line items summary */}
                   <div className="space-y-2 mb-4">
                     {lineItems.map((item, index) => (
@@ -371,10 +373,10 @@ export default function NewJobPage() {
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Divider */}
                   <div className="border-t border-primary/20 my-3"></div>
-                  
+
                   {/* Grand total */}
                   <div className="flex justify-between items-center">
                     <span className="font-medium">Grand Total:</span>
@@ -385,7 +387,7 @@ export default function NewJobPage() {
                   </p>
                 </div>
               </div>
-              
+
               <FormField
                 control={form.control}
                 name="notes"

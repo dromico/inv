@@ -350,27 +350,29 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="end_date"
-                  render={({ field }) => (
-                    <FormItem className="bg-card p-3 rounded-md shadow-sm">
-                      <FormLabel className="text-sm font-medium">End Date</FormLabel>
-                      <FormControl>
-                        <DatePicker
-                          date={field.value}
-                          setDate={field.onChange}
-                          disabled={isSubmitting}
-                          className="border-primary/20 focus-within:ring-1 focus-within:ring-primary/30"
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs mt-1">
-                        When the job will be completed
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {form.watch("start_date") && (
+                  <FormField
+                    control={form.control}
+                    name="end_date"
+                    render={({ field }) => (
+                      <FormItem className="bg-card p-3 rounded-md shadow-sm">
+                        <FormLabel className="text-sm font-medium">End Date</FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            date={field.value}
+                            setDate={field.onChange}
+                            disabled={isSubmitting}
+                            className="border-primary/20 focus-within:ring-1 focus-within:ring-primary/30"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs mt-1">
+                          When the job will be completed
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               <div className="space-y-6">
