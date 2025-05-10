@@ -201,20 +201,20 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center">
+    <div className="space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0">
         <Button
           variant="ghost"
           size="icon"
-          className="mr-2"
+          className="h-10 w-10 mr-0 sm:mr-2 self-start"
           onClick={() => router.back()}
         >
           <ArrowLeft className="h-5 w-5" />
           <span className="sr-only">Go back</span>
         </Button>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Job Details</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Job Details</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             View detailed information about your job
           </p>
         </div>
@@ -222,9 +222,9 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
 
       <div className="grid gap-6">
         <Card>
-          <CardHeader className="flex flex-row items-start justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
             <div>
-              <CardTitle className="text-2xl">{job.job_type}</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">{job.job_type}</CardTitle>
               <div className="flex items-center mt-1">
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(job.status)}`}>
                   {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
@@ -232,10 +232,10 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap gap-2">
               {job.status === 'pending' && (
                 <>
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className="h-10 px-4" asChild>
                     <Link href={`/dashboard/subcontractor/jobs/${job.id}/edit`}>
                       <Pencil className="h-4 w-4 mr-2" /> Edit
                     </Link>
@@ -243,6 +243,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                   <Button
                     variant="destructive"
                     size="sm"
+                    className="h-10 px-4"
                     onClick={() => setIsDeleteDialogOpen(true)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" /> Delete
@@ -251,7 +252,7 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               )}
 
               {job.status === 'completed' && (
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" className="h-10 px-4" asChild>
                   <Link href={`/dashboard/subcontractor/invoices/${job.id}`}>
                     <FileText className="h-4 w-4 mr-2" /> View Invoice
                   </Link>
@@ -260,12 +261,12 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 px-4 sm:px-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
                   <h3 className="font-medium text-sm text-muted-foreground">Location</h3>
-                  <p>{job.location}</p>
+                  <p className="break-words">{job.location}</p>
                 </div>
                 <div>
                   <h3 className="font-medium text-sm text-muted-foreground">Date Range</h3>
@@ -297,37 +298,39 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
             {job.line_items && Array.isArray(job.line_items) && job.line_items.length > 0 && (
               <div className="mt-4">
                 <h3 className="font-medium text-sm text-muted-foreground mb-2">Line Items</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-4 font-medium text-sm">Item</th>
-                        <th className="text-right py-2 px-4 font-medium text-sm">Quantity</th>
-                        <th className="text-right py-2 px-4 font-medium text-sm">Unit Price</th>
-                        <th className="text-right py-2 px-4 font-medium text-sm">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {job.line_items.map((item, index) => {
-                        const quantity = Number(item.unit_quantity || item.quantity || 0);
-                        const price = Number(item.unit_price || 0);
-                        const itemTotal = quantity * price;
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle">
+                    <table className="min-w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-sm">Item</th>
+                          <th className="text-right py-3 px-4 font-medium text-sm">Quantity</th>
+                          <th className="text-right py-3 px-4 font-medium text-sm">Unit Price</th>
+                          <th className="text-right py-3 px-4 font-medium text-sm">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {job.line_items.map((item, index) => {
+                          const quantity = Number(item.unit_quantity || item.quantity || 0);
+                          const price = Number(item.unit_price || 0);
+                          const itemTotal = quantity * price;
 
-                        return (
-                          <tr key={index} className="border-b border-muted">
-                            <td className="py-2 px-4">{item.item_name || `Item ${index + 1}`}</td>
-                            <td className="py-2 px-4 text-right">{quantity}</td>
-                            <td className="py-2 px-4 text-right">{formatCurrency(price)}</td>
-                            <td className="py-2 px-4 text-right">{formatCurrency(itemTotal)}</td>
-                          </tr>
-                        );
-                      })}
-                      <tr className="font-bold">
-                        <td colSpan={3} className="py-2 px-4 text-right">Grand Total:</td>
-                        <td className="py-2 px-4 text-right">{formatCurrency(calculateTotalAmount(job))}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                          return (
+                            <tr key={index} className="border-b border-muted">
+                              <td className="py-3 px-4">{item.item_name || `Item ${index + 1}`}</td>
+                              <td className="py-3 px-4 text-right">{quantity}</td>
+                              <td className="py-3 px-4 text-right">{formatCurrency(price)}</td>
+                              <td className="py-3 px-4 text-right">{formatCurrency(itemTotal)}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="font-bold">
+                          <td colSpan={3} className="py-3 px-4 text-right">Grand Total:</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateTotalAmount(job))}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -336,13 +339,13 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               <div className="mt-4">
                 <h3 className="font-medium text-sm text-muted-foreground mb-2">Notes</h3>
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="whitespace-pre-wrap">{job.notes}</p>
+                  <p className="whitespace-pre-wrap break-words">{job.notes}</p>
                 </div>
               </div>
             )}
           </CardContent>
 
-          <CardFooter>
+          <CardFooter className="px-4 sm:px-6">
             <p className="text-xs text-muted-foreground">
               Job ID: {job.id}
             </p>

@@ -26,21 +26,21 @@ export function JobHistory({ jobId }: JobHistoryProps) {
     async function fetchJobHistory() {
       try {
         setLoading(true)
-        
+
         // Fetch the job to get its creation date and current status
         const { data: jobData, error: jobError } = await supabase
           .from('jobs')
           .select('created_at, status, updated_at')
           .eq('id', jobId)
           .single()
-        
+
         if (jobError) throw jobError
-        
+
         if (!jobData) {
           setHistory([])
           return
         }
-        
+
         // Create history entries
         const historyEntries: JobHistoryEntry[] = [
           {
@@ -49,7 +49,7 @@ export function JobHistory({ jobId }: JobHistoryProps) {
             notes: 'Job submitted'
           }
         ]
-        
+
         // If the job status is not pending, add an entry for the status change
         if (jobData.status !== 'pending' && jobData.updated_at) {
           historyEntries.push({
@@ -58,12 +58,12 @@ export function JobHistory({ jobId }: JobHistoryProps) {
             notes: `Job marked as ${jobData.status}`
           })
         }
-        
+
         // Sort history by timestamp (newest first)
-        historyEntries.sort((a, b) => 
+        historyEntries.sort((a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         )
-        
+
         setHistory(historyEntries)
       } catch (error) {
         console.error('Error fetching job history:', error)
@@ -71,10 +71,10 @@ export function JobHistory({ jobId }: JobHistoryProps) {
         setLoading(false)
       }
     }
-    
+
     fetchJobHistory()
   }, [jobId, supabase])
-  
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'pending':
@@ -87,7 +87,7 @@ export function JobHistory({ jobId }: JobHistoryProps) {
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
-  
+
   const formatTimestamp = (timestamp: string) => {
     try {
       return format(new Date(timestamp), "PPP 'at' p")
@@ -95,7 +95,7 @@ export function JobHistory({ jobId }: JobHistoryProps) {
       return 'Invalid date'
     }
   }
-  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-4">
@@ -104,7 +104,7 @@ export function JobHistory({ jobId }: JobHistoryProps) {
       </div>
     )
   }
-  
+
   if (history.length === 0) {
     return (
       <div className="text-center p-4 text-muted-foreground">
@@ -112,28 +112,28 @@ export function JobHistory({ jobId }: JobHistoryProps) {
       </div>
     )
   }
-  
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-4 sm:px-6">
         <CardTitle className="text-lg">Job History</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <div className="space-y-4">
           {history.map((entry, index) => (
-            <div key={index} className="border-l-2 pl-4 pb-4 relative">
+            <div key={index} className="border-l-2 pl-3 sm:pl-4 pb-4 relative">
               <div className={`absolute w-3 h-3 rounded-full -left-[7px] top-1 border ${getStatusBadgeClass(entry.status)}`} />
               <div className="flex flex-col">
-                <div className="flex items-center">
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusBadgeClass(entry.status)}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-2.5 py-0.5 text-xs rounded-full ${getStatusBadgeClass(entry.status)}`}>
                     {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
                   </span>
-                  <span className="text-xs text-muted-foreground ml-2">
+                  <span className="text-xs text-muted-foreground">
                     {formatTimestamp(entry.timestamp)}
                   </span>
                 </div>
                 {entry.notes && (
-                  <p className="text-sm mt-1">{entry.notes}</p>
+                  <p className="text-sm mt-2">{entry.notes}</p>
                 )}
               </div>
             </div>

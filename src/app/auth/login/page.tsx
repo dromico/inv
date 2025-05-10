@@ -169,7 +169,9 @@ function LoginContent() {
         title: "Login failed",
         description: errorMessage,
       })
-    } finally {
+
+      // Only set loading to false on error
+      // This keeps the button in loading state during redirect
       setIsLoading(false)
     }
   }
