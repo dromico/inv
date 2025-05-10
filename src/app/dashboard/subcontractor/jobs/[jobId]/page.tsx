@@ -148,6 +148,35 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
     }
   }
 
+  // Calculate the total amount including all line items
+  const calculateTotalAmount = (job: Job): number => {
+    // Start with the base job amount (unit * unit_price)
+    let total = job.total || 0;
+
+    // If there are line items, add their totals (excluding the first item which is already in the base total)
+    if (job.line_items) {
+      try {
+        const lineItems = Array.isArray(job.line_items) ? job.line_items : [];
+
+        // Skip the first item if it exists (as it's already counted in the base total)
+        // and sum up the remaining items
+        if (lineItems.length > 1) {
+          const additionalTotal = lineItems.slice(1).reduce((sum, item) => {
+            const quantity = Number(item.unit_quantity || item.quantity || 0);
+            const price = Number(item.unit_price || 0);
+            return sum + (quantity * price);
+          }, 0);
+
+          total += additionalTotal;
+        }
+      } catch (error) {
+        console.error('Error calculating total from line items:', error);
+      }
+    }
+
+    return total;
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh]">
@@ -258,13 +287,52 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                 </div>
                 <div>
                   <h3 className="font-medium text-sm text-muted-foreground">Total Amount</h3>
-                  <p className="text-lg font-bold">{formatCurrency(job.total)}</p>
+                  <p className="text-lg font-bold">{formatCurrency(calculateTotalAmount(job))}</p>
                 </div>
               </div>
             </div>
 
+            {/* Display line items if they exist */}
+            {job.line_items && Array.isArray(job.line_items) && job.line_items.length > 0 && (
+              <div className="mt-4">
+                <h3 className="font-medium text-sm text-muted-foreground mb-2">Line Items</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4 font-medium text-sm">Item</th>
+                        <th className="text-right py-2 px-4 font-medium text-sm">Quantity</th>
+                        <th className="text-right py-2 px-4 font-medium text-sm">Unit Price</th>
+                        <th className="text-right py-2 px-4 font-medium text-sm">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {job.line_items.map((item, index) => {
+                        const quantity = Number(item.unit_quantity || item.quantity || 0);
+                        const price = Number(item.unit_price || 0);
+                        const itemTotal = quantity * price;
+
+                        return (
+                          <tr key={index} className="border-b border-muted">
+                            <td className="py-2 px-4">{item.item_name || `Item ${index + 1}`}</td>
+                            <td className="py-2 px-4 text-right">{quantity}</td>
+                            <td className="py-2 px-4 text-right">{formatCurrency(price)}</td>
+                            <td className="py-2 px-4 text-right">{formatCurrency(itemTotal)}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="font-bold">
+                        <td colSpan={3} className="py-2 px-4 text-right">Grand Total:</td>
+                        <td className="py-2 px-4 text-right">{formatCurrency(calculateTotalAmount(job))}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {job.notes && (
-              <div>
+              <div className="mt-4">
                 <h3 className="font-medium text-sm text-muted-foreground mb-2">Notes</h3>
                 <div className="p-4 rounded-lg bg-muted/50">
                   <p className="whitespace-pre-wrap">{job.notes}</p>
