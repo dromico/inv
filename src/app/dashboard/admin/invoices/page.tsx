@@ -111,14 +111,14 @@ export default function AdminInvoicesPage() {
   const loadInvoices = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // Build the base query
       let query = supabase
         .from('invoices')
         .select(`
           *,
           jobs ( id, job_type, location, line_items ),
-          profiles ( id, company_name )
+          profiles:subcontractor_id ( id, company_name )
         `, { count: 'exact' })
         .order('invoice_date', { ascending: false });
 
@@ -131,17 +131,17 @@ export default function AdminInvoicesPage() {
       if (subcontractorFilter !== "all") {
         query = query.eq('subcontractor_id', subcontractorFilter);
       }
-      
+
       // Apply search filter if provided
       if (searchQuery) {
         // Create search pattern with wildcards
         const searchPattern = `%${searchQuery}%`;
-        
+
         // Use separate filters for each condition
         // Note: We can't directly filter on foreign tables in the OR clause
         // So we'll use a simpler approach for now
         query = query.or('id.neq.no_match'); // This creates a dummy condition that's always true
-        
+
         // We'll handle the search filtering in JavaScript after fetching the data
         // This is a workaround for the limitations of the Supabase query API
       }
@@ -161,7 +161,7 @@ export default function AdminInvoicesPage() {
       if (data) {
         // Apply client-side filtering for search if needed
         let filteredData = data;
-        
+
         if (searchQuery && data.length > 0) {
           const searchLower = searchQuery.toLowerCase();
           filteredData = data.filter(invoice => {
@@ -169,20 +169,20 @@ export default function AdminInvoicesPage() {
             const jobTypeMatch = invoice.jobs?.job_type
               ? invoice.jobs.job_type.toLowerCase().includes(searchLower)
               : false;
-              
+
             // Check company_name (with null/undefined handling)
             const companyMatch = invoice.profiles?.company_name
               ? invoice.profiles.company_name.toLowerCase().includes(searchLower)
               : false;
-              
+
             // Return true if either matches
             return jobTypeMatch || companyMatch;
           });
         }
-        
+
         // Ensure data matches the expected type
         setInvoices(filteredData as InvoiceWithDetails[]);
-        
+
         // If we're doing client-side filtering, we need to adjust the total count
         if (searchQuery) {
           setTotalInvoices(filteredData.length);
@@ -393,7 +393,7 @@ export default function AdminInvoicesPage() {
                           {invoice.status || 'N/A'}
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <p className="text-muted-foreground">Subcontractor</p>
@@ -408,7 +408,7 @@ export default function AdminInvoicesPage() {
                           <p className="font-medium">{formatCurrency(invoice.total_amount)}</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex justify-end gap-2 pt-2">
                         <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
                           Details
@@ -424,7 +424,7 @@ export default function AdminInvoicesPage() {
                 })}
               </div>
             </div>
-            
+
             {/* Desktop table view */}
             <div className="hidden md:block">
               <Table>
@@ -631,7 +631,7 @@ export default function AdminInvoicesPage() {
                 <div className="font-medium">Last Updated:</div>
                 <div className="col-span-3">{formatDate(selectedInvoice.updated_at)}</div>
               </div>
-              
+
               {/* Line Items Section */}
               <div className="col-span-4 mt-4">
                 <div className="font-medium mb-2">Line Items:</div>
@@ -651,7 +651,7 @@ export default function AdminInvoicesPage() {
                           if (typeof item !== 'object' || item === null) {
                             return null; // Skip non-object items
                           }
-                          
+
                           const itemObj = item as { [key: string]: Json };
                           const description = String(itemObj.description || itemObj.item_name || 'N/A');
                           const quantity = Number(itemObj.quantity || itemObj.unit_quantity || 0);

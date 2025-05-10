@@ -277,21 +277,6 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
                   <p>{formatDate(job.created_at)}</p>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground">Units</h3>
-                  <p>{job.unit} units</p>
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground">Unit Price</h3>
-                  <p>{formatCurrency(job.unit_price)}</p>
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground">Total Amount</h3>
-                  <p className="text-lg font-bold">{formatCurrency(calculateTotalAmount(job))}</p>
-                </div>
-              </div>
             </div>
 
             {/* Display line items if they exist */}
