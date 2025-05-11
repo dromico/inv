@@ -163,6 +163,35 @@ export default function AdminJobsPage() {
     }).format(amount || 0)
   }
 
+  // Calculate the total amount including all line items
+  const calculateTotalAmount = (job: JobWithSubcontractor): number => {
+    // Start with the base job amount (unit * unit_price)
+    let total = job.total || 0;
+
+    // If there are line items, add their totals
+    if (job.line_items) {
+      try {
+        const lineItems = Array.isArray(job.line_items) ? job.line_items : [];
+
+        // Calculate total from all line items
+        const lineItemsTotal = lineItems.reduce((sum, item) => {
+          const quantity = Number(item.unit_quantity || item.quantity || 0);
+          const price = Number(item.unit_price || 0);
+          return sum + (quantity * price);
+        }, 0);
+
+        // If we have line items, use their total instead of the base total
+        if (lineItems.length > 0) {
+          return lineItemsTotal;
+        }
+      } catch (error) {
+        console.error('Error calculating total from line items:', error);
+      }
+    }
+
+    return total;
+  }
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value)
   }
@@ -259,16 +288,16 @@ export default function AdminJobsPage() {
                       <div>{formatDate(job.start_date)} - {formatDate(job.end_date)}</div>
 
                       <div className="text-muted-foreground">Amount:</div>
-                      <div className="font-medium">{formatCurrency(job.total)}</div>
+                      <div className="font-medium">{formatCurrency(calculateTotalAmount(job))}</div>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
                       <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleViewDetails(job)}>
                         Details
                       </Button>
-                      {job.status === 'completed' && (
+                      {(job.status === 'completed' || job.status === 'in-progress') && (
                         <Button variant="outline" size="sm" className="h-7 text-xs px-2" asChild>
-                          <Link href={`/dashboard/admin/invoices/${job.id}`}>
+                          <Link href={`/api/admin/invoices/${job.id}`}>
                             <Download className="h-3 w-3 mr-1" /> Invoice
                           </Link>
                         </Button>
@@ -300,7 +329,7 @@ export default function AdminJobsPage() {
                       <TableCell>{job.profile?.company_name}</TableCell>
                       <TableCell>{job.location}</TableCell>
                       <TableCell>{formatDate(job.start_date)} - {formatDate(job.end_date)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(job.total)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(calculateTotalAmount(job))}</TableCell>
                       <TableCell>
                         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           job.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -347,11 +376,11 @@ export default function AdminJobsPage() {
                               <CheckSquare className="mr-2 h-4 w-4 text-green-500" />
                               Set as Completed
                             </DropdownMenuItem>
-                            {job.status === 'completed' && (
+                            {(job.status === 'completed' || job.status === 'in-progress') && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/admin/invoices/${job.id}`}>
+                                  <Link href={`/api/admin/invoices/${job.id}`}>
                                     <Download className="mr-2 h-4 w-4" />
                                     Generate Invoice
                                   </Link>
@@ -461,72 +490,102 @@ export default function AdminJobsPage() {
       {/* Job details dialog */}
       {selectedJob && (
         <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-[525px]">
+          <DialogContent className="max-w-[95vw] sm:max-w-[700px]">
             <DialogHeader>
-              <DialogTitle>Job Details</DialogTitle>
+              <DialogTitle>{selectedJob.job_type}</DialogTitle>
               <DialogDescription>
-                Detailed information about the selected job.
+                Submitted by {selectedJob.profile?.company_name || "Unknown Subcontractor"}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job Type:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedJob.job_type}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedJob.profile?.company_name}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Location:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedJob.location}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Date Range:</div>
-                <div className="col-span-2 sm:col-span-3">
-                  {formatDate(selectedJob.start_date)} - {formatDate(selectedJob.end_date)}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Unit:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedJob.unit}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Unit Price:</div>
-                <div className="col-span-2 sm:col-span-3">{formatCurrency(selectedJob.unit_price)}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Total:</div>
-                <div className="col-span-2 sm:col-span-3 font-bold">{formatCurrency(selectedJob.total)}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Status:</div>
-                <div className="col-span-2 sm:col-span-3">
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    selectedJob.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    selectedJob.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                    'bg-amber-100 text-amber-800'
-                  }`}>
-                    {selectedJob.status}
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground">Location</h3>
+                    <p className="break-words">{selectedJob.location}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground">Date Range</h3>
+                    <p>{formatDate(selectedJob.start_date)} to {formatDate(selectedJob.end_date)}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground">Submission Date</h3>
+                    <p>{new Date(selectedJob.created_at).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground">Status</h3>
+                    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      selectedJob.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      selectedJob.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {selectedJob.status}
+                    </div>
                   </div>
                 </div>
               </div>
-              {selectedJob.notes && (
-                <div className="grid grid-cols-3 sm:grid-cols-4 items-start gap-4">
-                  <div className="font-medium">Notes:</div>
-                  <div className="col-span-2 sm:col-span-3 whitespace-pre-wrap">{selectedJob.notes}</div>
+
+              {/* Display line items if they exist */}
+              {selectedJob.line_items && Array.isArray(selectedJob.line_items) && selectedJob.line_items.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="font-medium text-sm text-muted-foreground mb-2">Line Items</h3>
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <div className="inline-block min-w-full align-middle">
+                      <table className="min-w-full border-collapse">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-3 px-4 font-medium text-sm">Item</th>
+                            <th className="text-right py-3 px-4 font-medium text-sm">Quantity</th>
+                            <th className="text-right py-3 px-4 font-medium text-sm">Unit Price</th>
+                            <th className="text-right py-3 px-4 font-medium text-sm">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedJob.line_items.map((item, index) => {
+                            const quantity = Number(item.unit_quantity || item.quantity || 0);
+                            const price = Number(item.unit_price || 0);
+                            const itemTotal = quantity * price;
+
+                            return (
+                              <tr key={index} className="border-b border-muted">
+                                <td className="py-3 px-4">{item.item_name || `Item ${index + 1}`}</td>
+                                <td className="py-3 px-4 text-right">{quantity}</td>
+                                <td className="py-3 px-4 text-right">{formatCurrency(price)}</td>
+                                <td className="py-3 px-4 text-right">{formatCurrency(itemTotal)}</td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="font-bold">
+                            <td colSpan={3} className="py-3 px-4 text-right">Grand Total:</td>
+                            <td className="py-3 px-4 text-right">{formatCurrency(calculateTotalAmount(selectedJob))}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Submitted:</div>
-                <div className="col-span-2 sm:col-span-3">{new Date(selectedJob.created_at).toLocaleString()}</div>
+
+              {selectedJob.notes && (
+                <div className="mt-4">
+                  <h3 className="font-medium text-sm text-muted-foreground mb-2">Notes</h3>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="whitespace-pre-wrap break-words">{selectedJob.notes}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-xs text-muted-foreground">
+                Job ID: {selectedJob.id}
               </div>
             </div>
+
             <DialogFooter>
               <div className="flex flex-col sm:flex-row gap-2 justify-end w-full">
-                {selectedJob.status === 'completed' && (
+                {(selectedJob.status === 'completed' || selectedJob.status === 'in-progress') && (
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href={`/dashboard/admin/invoices/${selectedJob.id}`}>
+                    <Link href={`/api/admin/invoices/${selectedJob.id}`}>
                       <Download className="mr-2 h-4 w-4" /> Generate Invoice
                     </Link>
                   </Button>

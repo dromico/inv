@@ -7,6 +7,7 @@ import { Database, Json } from "@/types/database"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PDFButtonLoading } from "@/components/pdf-loading"
 import {
   Table,
   TableBody,
@@ -81,6 +82,7 @@ export default function AdminInvoicesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalInvoices, setTotalInvoices] = useState(0)
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithDetails | null>(null)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null)
   const invoicesPerPage = 10
 
   const { toast } = useToast()
@@ -413,10 +415,23 @@ export default function AdminInvoicesPage() {
                         <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
                           Details
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/dashboard/admin/invoices/${invoice.job_id}`}>
-                            <Download className="h-4 w-4 mr-1" /> PDF
-                          </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsGeneratingPDF(invoice.job_id);
+                            window.open(`/api/admin/invoices/${invoice.job_id}`, '_blank');
+                            setTimeout(() => setIsGeneratingPDF(null), 1000);
+                          }}
+                          disabled={isGeneratingPDF === invoice.job_id}
+                        >
+                          {isGeneratingPDF === invoice.job_id ? (
+                            <PDFButtonLoading />
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-1" /> PDF
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -491,12 +506,22 @@ export default function AdminInvoicesPage() {
                                 Mark as Paid
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem asChild>
-                                {/* Link uses job_id from the invoice record */}
-                                <Link href={`/dashboard/admin/invoices/${invoice.job_id}`}>
-                                  <Download className="mr-2 h-4 w-4" />
-                                  Download PDF
-                                </Link>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setIsGeneratingPDF(invoice.job_id);
+                                  window.open(`/api/admin/invoices/${invoice.job_id}`, '_blank');
+                                  setTimeout(() => setIsGeneratingPDF(null), 1000);
+                                }}
+                                disabled={isGeneratingPDF === invoice.job_id}
+                              >
+                                {isGeneratingPDF === invoice.job_id ? (
+                                  <PDFButtonLoading />
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download PDF
+                                  </>
+                                )}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -676,10 +701,21 @@ export default function AdminInvoicesPage() {
             </div>
             <DialogFooter>
                <Button variant="outline" onClick={() => setSelectedInvoice(null)}>Close</Button>
-               <Button asChild>
-                 <Link href={`/dashboard/admin/invoices/${selectedInvoice.job_id}`}>
-                   <Download className="mr-2 h-4 w-4" /> Download PDF
-                 </Link>
+               <Button
+                 onClick={() => {
+                   setIsGeneratingPDF(selectedInvoice.job_id);
+                   window.open(`/api/admin/invoices/${selectedInvoice.job_id}`, '_blank');
+                   setTimeout(() => setIsGeneratingPDF(null), 1000);
+                 }}
+                 disabled={isGeneratingPDF === selectedInvoice.job_id}
+               >
+                 {isGeneratingPDF === selectedInvoice.job_id ? (
+                   <PDFButtonLoading />
+                 ) : (
+                   <>
+                     <Download className="mr-2 h-4 w-4" /> Download PDF
+                   </>
+                 )}
                </Button>
             </DialogFooter>
           </DialogContent>

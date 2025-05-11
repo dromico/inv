@@ -11,8 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { FileText, CheckCircle, Send, Download } from "lucide-react"
+import { FileText, CheckCircle, Send, Download, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { PDFButtonLoading } from "@/components/pdf-loading"
 
 // Define types based on the database schema
 type InvoiceRecord = Database['public']['Tables']['invoices']['Row']
@@ -50,18 +51,18 @@ function formatDate(dateString: string | null) {
 export default async function SubcontractorInvoicesPage() {
   console.log("InvoicesPage: Creating server component client")
   const supabase = await createServerComponentClient()
-  
+
   // Get the current user
   console.log("InvoicesPage: Fetching user with server component client")
   const { data: { user }, error: userError } = await supabase.auth.getUser()
-  
+
   console.log("InvoicesPage: Auth check result:", {
     hasUser: !!user,
     userId: user?.id,
     userEmail: user?.email,
     error: userError ? JSON.stringify(userError) : null
   })
-  
+
   if (!user) {
     return (
       <div className="space-y-6">
@@ -73,29 +74,29 @@ export default async function SubcontractorInvoicesPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground mb-4">You must be logged in to view your invoices</p>
         </div>
       </div>
     )
   }
-  
+
   try {
     // Fetch invoices for the current user's completed jobs only
     console.log("Fetching invoices for user:", user.id);
-    
+
     // First, get the jobs that belong to this subcontractor
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('id')
       .eq('subcontractor_id', user.id);
-      
+
     if (jobsError) {
       console.error('Error fetching jobs:', jobsError);
       throw new Error(`Error fetching jobs: ${JSON.stringify(jobsError)}`);
     }
-    
+
     if (!jobs || jobs.length === 0) {
       return (
         <div className="space-y-6">
@@ -107,21 +108,21 @@ export default async function SubcontractorInvoicesPage() {
               </p>
             </div>
           </div>
-          
+
           <div className="rounded-md border p-8 text-center">
             <p className="text-muted-foreground mb-4">You don't have any jobs yet.</p>
           </div>
         </div>
       );
     }
-    
+
     // Get the job IDs
     const jobIds = jobs.map((job: any) => job.id);
     console.log("Found job IDs:", jobIds);
-    
+
     // Now fetch invoices for these jobs
     console.log("Fetching invoices for job IDs:", jobIds);
-    
+
     // Try the query without ordering
     console.log("Fetching invoices without ordering");
     const { data: invoices, error: invoicesError } = await supabase
@@ -131,22 +132,22 @@ export default async function SubcontractorInvoicesPage() {
         jobs (id, job_type, location, status)
       `)
       .in('job_id', jobIds);
-      
+
     console.log("Invoices query result:", {
       hasInvoices: !!invoices && invoices.length > 0,
       count: invoices?.length,
       error: invoicesError ? JSON.stringify(invoicesError) : null
     });
-    
+
     if (invoicesError) {
       throw new Error(`Error fetching invoices: ${JSON.stringify(invoicesError)}`);
     }
-    
+
     // Handle loading state with skeleton UI
     if (!invoices) {
       return <InvoicesLoadingSkeleton />
     }
-    
+
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -157,7 +158,7 @@ export default async function SubcontractorInvoicesPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="rounded-md border">
           {invoices.length > 0 && invoices.filter((invoice: any) => invoice.jobs?.status === 'completed').length > 0 ? (
             <Table>
@@ -193,13 +194,13 @@ export default async function SubcontractorInvoicesPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end space-x-2">
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/dashboard/subcontractor/invoices/${invoice.job_id}`}>
+                            <Link href={`/api/invoices/${invoice.job_id}`}>
                               <FileText className="mr-2 h-4 w-4" />
                               View
                             </Link>
                           </Button>
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/dashboard/admin/invoices/${invoice.job_id}`} target="_blank">
+                            <Link href={`/api/invoices/${invoice.job_id}`} target="_blank">
                               <Download className="mr-2 h-4 w-4" />
                               PDF
                             </Link>
@@ -220,7 +221,7 @@ export default async function SubcontractorInvoicesPage() {
     )
   } catch (error) {
     console.error('Error in SubcontractorInvoicesPage:', error instanceof Error ? error.message : JSON.stringify(error));
-    
+
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -231,7 +232,7 @@ export default async function SubcontractorInvoicesPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground mb-4">Failed to load invoices. Please try again later.</p>
           <p className="text-sm text-red-500">
@@ -255,7 +256,7 @@ function InvoicesLoadingSkeleton() {
           </p>
         </div>
       </div>
-      
+
       <div className="rounded-md border">
         <div className="p-1">
           <div className="flex items-center p-4">

@@ -10,8 +10,9 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatDate, formatCurrency } from "@/lib/utils"
-import { AlertCircle, ArrowLeft, FileText, Loader2, Pencil, Trash2 } from "lucide-react"
+import { AlertCircle, ArrowLeft, FileText, Loader2, Pencil, Trash2, Download } from "lucide-react"
 import { JobHistory } from "@/components/job-history"
+import { PDFButtonLoading } from "@/components/pdf-loading"
 import {
   Dialog,
   DialogContent,
@@ -252,11 +253,18 @@ export default function JobDetailsPage({ params }: JobDetailsPageProps) {
               )}
 
               {job.status === 'completed' && (
-                <Button variant="outline" size="sm" className="h-10 px-4" asChild>
-                  <Link href={`/dashboard/subcontractor/invoices/${job.id}`}>
-                    <FileText className="h-4 w-4 mr-2" /> View Invoice
-                  </Link>
-                </Button>
+                <>
+                  <Button variant="outline" size="sm" className="h-10 px-4" asChild>
+                    <Link href={`/api/invoices/${job.id}`}>
+                      <FileText className="h-4 w-4 mr-2" /> View Invoice
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-10 px-4" asChild>
+                    <Link href={`/api/invoices/${job.id}`} target="_blank">
+                      <Download className="h-4 w-4 mr-2" /> PDF
+                    </Link>
+                  </Button>
+                </>
               )}
             </div>
           </CardHeader>
