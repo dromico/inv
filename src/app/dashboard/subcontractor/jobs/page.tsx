@@ -3,7 +3,6 @@ import { format } from "date-fns"
 import { createServerComponentClient } from "@/lib/supabase-server"
 import { Json } from "@/types/database"
 import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
 import { JobSubmissionSuccess } from "@/components/job-submission-success"
 import {
   Table,
@@ -14,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Plus } from "lucide-react"
+import { EnhancedFAB } from "@/components/enhanced-fab"
+import { JobsLoadingSkeleton } from "@/components/jobs-skeleton"
 
 // Define the job type that matches what we get from the database
 interface JobFromDB {
@@ -78,33 +79,6 @@ function calculateTotalAmount(job: JobFromDB): number {
 function formatDate(dateString: string | null) {
   if (!dateString) return 'N/A'
   return format(new Date(dateString), "PPP")
-}
-
-// Loading skeleton component
-function JobsLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-        <div>
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-72 mt-2" />
-        </div>
-        <Skeleton className="h-10 w-32" />
-      </div>
-
-      <div className="rounded-md border">
-        <div className="p-4">
-          <div className="space-y-4">
-            {Array(5).fill(null).map((_, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export default async function JobsPage() {
@@ -313,17 +287,10 @@ export default async function JobsPage() {
       </div>
 
       {/* Mobile Floating Action Button for New Job */}
-      <div className="fixed bottom-6 right-6 sm:hidden z-10">
-        <Button
-          size="lg"
-          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all bg-black text-white hover:bg-gray-800"
-          asChild
-        >
-          <Link href="/dashboard/subcontractor/jobs/new">
-            <Plus className="h-6 w-6" />
-          </Link>
-        </Button>
-      </div>
+      <EnhancedFAB
+        href="/dashboard/subcontractor/jobs/new"
+        iconName="plus"
+      />
     </div>
   )
 }

@@ -8,6 +8,9 @@ import { useToast } from "@/hooks/use-toast"
 import { CalendarDays, FileText, Plus } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { EnhancedFAB } from "@/components/enhanced-fab"
+import { Skeleton } from "@/components/ui/skeleton"
+import { DashboardSkeleton } from "@/components/dashboard-skeleton"
 
 export default function SubcontractorDashboard() {
   const [jobStats, setJobStats] = useState({
@@ -103,6 +106,11 @@ export default function SubcontractorDashboard() {
     }).format(date)
   }
 
+  // Show skeleton loading state while data is being fetched
+  if (loading) {
+    return <DashboardSkeleton />
+  }
+
   return (
     <div className="space-y-6 relative pb-20 sm:pb-0">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -173,17 +181,10 @@ export default function SubcontractorDashboard() {
       </div>
 
       {/* Mobile Floating Action Button for New Job */}
-      <div className="fixed bottom-6 right-6 sm:hidden z-10">
-        <Button
-          size="lg"
-          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all bg-black text-white hover:bg-gray-800"
-          asChild
-        >
-          <Link href="/dashboard/subcontractor/jobs/new">
-            <Plus className="h-6 w-6" />
-          </Link>
-        </Button>
-      </div>
+      <EnhancedFAB
+        href="/dashboard/subcontractor/jobs/new"
+        iconName="plus"
+      />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="col-span-1 shadow-sm hover:shadow-md transition-shadow">
@@ -197,11 +198,7 @@ export default function SubcontractorDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
-            {loading ? (
-              <div className="h-[200px] flex items-center justify-center">
-                <p className="text-muted-foreground">Loading...</p>
-              </div>
-            ) : recentJobs.length > 0 ? (
+            {recentJobs.length > 0 ? (
               <div className="space-y-4">
                 {recentJobs.map((job) => (
                   <div key={job.id} className="flex items-center space-x-4 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors">
@@ -250,11 +247,7 @@ export default function SubcontractorDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
-            {loading ? (
-              <div className="h-[200px] flex items-center justify-center">
-                <p className="text-muted-foreground">Loading...</p>
-              </div>
-            ) : notifications.length > 0 ? (
+            {notifications.length > 0 ? (
               <div className="space-y-4">
                 {notifications.map((notification) => (
                   <div key={notification.id} className="flex items-start space-x-4 border-l-4 border-primary pl-4 py-2 bg-gray-50 rounded-r-lg">
