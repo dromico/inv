@@ -26,14 +26,14 @@ export default function SubcontractorDashboard() {
     async function loadDashboardData() {
       try {        setLoading(true)
         let userId = null;
-        
+
         // Get current user with improved error handling
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError) {
           throw new Error(`Authentication error: ${userError.message}`);
         }
-        
+
         if (!user) {
           toast({
             variant: "destructive",
@@ -96,93 +96,107 @@ export default function SubcontractorDashboard() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return new Intl.DateTimeFormat('en-MY', { 
-      year: 'numeric', 
-      month: 'short', 
+    return new Intl.DateTimeFormat('en-MY', {
+      year: 'numeric',
+      month: 'short',
       day: 'numeric'
     }).format(date)
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 relative pb-20 sm:pb-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Subcontractor Dashboard</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Subcontractor Dashboard</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage your job submissions and track their status
           </p>
         </div>
-        <Button asChild>
+        {/* Desktop New Job button - hidden on mobile */}
+        <Button className="hidden sm:flex" asChild>
           <Link href="/dashboard/subcontractor/jobs/new">
             <Plus className="mr-2 h-4 w-4" /> New Job
           </Link>
         </Button>
       </div>
-      
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               Total Jobs
             </CardTitle>
             <div className="h-4 w-4 text-muted-foreground">
               {jobStats.totalJobs}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobStats.totalJobs}</div>
+          <CardContent className="px-3 sm:px-6">
+            <div className="text-xl sm:text-2xl font-bold">{jobStats.totalJobs}</div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               Pending Jobs
             </CardTitle>
             <div className="rounded-full h-3 w-3 bg-amber-500"/>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobStats.pendingJobs}</div>
+          <CardContent className="px-3 sm:px-6">
+            <div className="text-xl sm:text-2xl font-bold">{jobStats.pendingJobs}</div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               In Progress
             </CardTitle>
             <div className="rounded-full h-3 w-3 bg-blue-500"/>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobStats.inProgressJobs}</div>
+          <CardContent className="px-3 sm:px-6">
+            <div className="text-xl sm:text-2xl font-bold">{jobStats.inProgressJobs}</div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               Completed
             </CardTitle>
             <div className="rounded-full h-3 w-3 bg-green-500"/>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobStats.completedJobs}</div>
+          <CardContent className="px-3 sm:px-6">
+            <div className="text-xl sm:text-2xl font-bold">{jobStats.completedJobs}</div>
           </CardContent>
         </Card>
       </div>
-      
+
+      {/* Mobile Floating Action Button for New Job */}
+      <div className="fixed bottom-6 right-6 sm:hidden z-10">
+        <Button
+          size="lg"
+          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all bg-black text-white hover:bg-gray-800"
+          asChild
+        >
+          <Link href="/dashboard/subcontractor/jobs/new">
+            <Plus className="h-6 w-6" />
+          </Link>
+        </Button>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center">
+        <Card className="col-span-1 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="flex items-center text-base sm:text-lg">
               <CalendarDays className="mr-2 h-5 w-5 text-muted-foreground" />
               Recent Jobs
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Your recently submitted jobs
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {loading ? (
               <div className="h-[200px] flex items-center justify-center">
                 <p className="text-muted-foreground">Loading...</p>
@@ -190,15 +204,15 @@ export default function SubcontractorDashboard() {
             ) : recentJobs.length > 0 ? (
               <div className="space-y-4">
                 {recentJobs.map((job) => (
-                  <div key={job.id} className="flex items-center space-x-4">
+                  <div key={job.id} className="flex items-center space-x-4 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors">
                     <div className="flex-1 space-y-1">
                       <p className="text-sm font-medium leading-none">{job.job_type}</p>
-                      <p className="text-sm text-muted-foreground">{job.location}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{job.location}</p>
                     </div>
-                    <div className={`px-2 py-1 text-xs rounded-full ${
-                      job.status === 'completed' ? 'bg-green-100 text-green-700' : 
-                      job.status === 'in-progress' ? 'bg-blue-100 text-blue-700' : 
-                      'bg-amber-100 text-amber-700'
+                    <div className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                      job.status === 'completed' ? 'bg-green-100 text-green-700 border border-green-200' :
+                      job.status === 'in-progress' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                      'bg-amber-100 text-amber-700 border border-amber-200'
                     }`}>
                       {job.status}
                     </div>
@@ -208,8 +222,8 @@ export default function SubcontractorDashboard() {
             ) : (
               <div className="h-[200px] flex items-center justify-center">
                 <div className="text-center">
-                  <p className="text-muted-foreground mb-2">No jobs submitted yet</p>
-                  <Button asChild size="sm">
+                  <p className="text-muted-foreground mb-4">No jobs submitted yet</p>
+                  <Button asChild size="sm" className="h-10 px-4">
                     <Link href="/dashboard/subcontractor/jobs/new">
                       Add Your First Job
                     </Link>
@@ -218,24 +232,24 @@ export default function SubcontractorDashboard() {
               </div>
             )}
           </CardContent>
-          <CardFooter>
-            <Button variant="outline" asChild className="w-full">
+          <CardFooter className="px-4 sm:px-6">
+            <Button variant="outline" asChild className="w-full h-10">
               <Link href="/dashboard/subcontractor/jobs">View All Jobs</Link>
             </Button>
           </CardFooter>
         </Card>
-        
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center">
+
+        <Card className="col-span-1 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="flex items-center text-base sm:text-lg">
               <FileText className="mr-2 h-5 w-5 text-muted-foreground" />
               Notifications
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Recent updates on your jobs
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {loading ? (
               <div className="h-[200px] flex items-center justify-center">
                 <p className="text-muted-foreground">Loading...</p>
@@ -243,7 +257,7 @@ export default function SubcontractorDashboard() {
             ) : notifications.length > 0 ? (
               <div className="space-y-4">
                 {notifications.map((notification) => (
-                  <div key={notification.id} className="flex items-start space-x-4 border-l-4 border-primary pl-4 py-2">
+                  <div key={notification.id} className="flex items-start space-x-4 border-l-4 border-primary pl-4 py-2 bg-gray-50 rounded-r-lg">
                     <div className="flex-1 space-y-1">
                       <p className="text-sm">{notification.message}</p>
                       <p className="text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
@@ -257,8 +271,8 @@ export default function SubcontractorDashboard() {
               </div>
             )}
           </CardContent>
-          <CardFooter>
-            <Button variant="outline" asChild className="w-full">
+          <CardFooter className="px-4 sm:px-6">
+            <Button variant="outline" asChild className="w-full h-10">
               <Link href="/dashboard/subcontractor/notifications">View All Notifications</Link>
             </Button>
           </CardFooter>

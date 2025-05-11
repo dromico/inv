@@ -183,7 +183,7 @@ export default async function JobsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative pb-20 sm:pb-0">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-6">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Jobs</h2>
@@ -191,7 +191,8 @@ export default async function JobsPage() {
             Manage your job submissions
           </p>
         </div>
-        <Button size="sm" className="md:h-10" asChild>
+        {/* Desktop New Job button - hidden on mobile */}
+        <Button size="sm" className="hidden sm:flex md:h-10" asChild>
           <Link href="/dashboard/subcontractor/jobs/new">
             <Plus className="mr-2 h-4 w-4" /> New Job
           </Link>
@@ -201,44 +202,44 @@ export default async function JobsPage() {
       {/* Success message for job submission */}
       <JobSubmissionSuccess />
 
-      <div className="rounded-md border">
+      <div className="rounded-md border shadow-sm">
         {jobs && jobs.length > 0 ? (
           <>
             {/* Mobile view - card layout */}
             <div className="md:hidden">
-              <div className="space-y-2 p-2">
+              <div className="space-y-3 p-3">
                 {jobs.map((job) => (
-                  <div key={job.id} className="rounded-lg border p-3 space-y-2">
+                  <div key={job.id} className="rounded-lg border border-gray-200 p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow hover:border-gray-300">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-medium text-sm">{job.job_type}</h3>
+                      <h3 className="font-medium text-base">{job.job_type}</h3>
                       {job.status ? (
-                        <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          job.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                          'bg-amber-100 text-amber-800'
+                        <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                          job.status === 'completed' ? 'bg-green-100 text-green-800 border border-green-200' :
+                          job.status === 'in-progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                          'bg-amber-100 text-amber-800 border border-amber-200'
                         }`}>
                           {job.status}
                         </div>
                       ) : (
-                        <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
                           Undefined
                         </div>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1 text-xs">
-                      <div className="text-muted-foreground">Location:</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-muted-foreground font-medium">Location:</div>
                       <div>{job.location}</div>
 
-                      <div className="text-muted-foreground">Date:</div>
+                      <div className="text-muted-foreground font-medium">Date:</div>
                       <div>{formatDate(job.start_date)} - {formatDate(job.end_date)}</div>
 
-                      <div className="text-muted-foreground">Total:</div>
-                      <div className="font-medium">{formatCurrency(calculateTotalAmount(job))}</div>
+                      <div className="text-muted-foreground font-medium">Total:</div>
+                      <div className="font-bold">{formatCurrency(calculateTotalAmount(job))}</div>
                     </div>
 
                     <div className="pt-2 flex justify-end">
-                      <Button variant="outline" size="sm" className="h-7 text-xs px-2" asChild>
+                      <Button variant="outline" size="sm" className="h-10 px-4 text-sm" asChild>
                         <Link href={`/dashboard/subcontractor/jobs/${job.id}`}>
                           View Details
                         </Link>
@@ -273,14 +274,14 @@ export default async function JobsPage() {
                       <TableCell>
                         {job.status ? (
                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            job.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            job.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                            'bg-amber-100 text-amber-800'
+                            job.status === 'completed' ? 'bg-green-100 text-green-800 border border-green-200' :
+                            job.status === 'in-progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                            'bg-amber-100 text-amber-800 border border-amber-200'
                           }`}>
                             {job.status}
                           </div>
                         ) : (
-                          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
                             Undefined
                           </div>
                         )}
@@ -309,6 +310,19 @@ export default async function JobsPage() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Mobile Floating Action Button for New Job */}
+      <div className="fixed bottom-6 right-6 sm:hidden z-10">
+        <Button
+          size="lg"
+          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all bg-black text-white hover:bg-gray-800"
+          asChild
+        >
+          <Link href="/dashboard/subcontractor/jobs/new">
+            <Plus className="h-6 w-6" />
+          </Link>
+        </Button>
       </div>
     </div>
   )
