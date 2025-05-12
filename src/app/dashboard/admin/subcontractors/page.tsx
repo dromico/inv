@@ -14,8 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
-  DropdownMenu, 
+import {
+  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -35,6 +35,8 @@ import {
   Mail,
   MapPin,
   FileText,
+  Trash2,
+  Loader2,
 } from "lucide-react"
 import {
   Select,
@@ -78,8 +80,11 @@ export default function AdminSubcontractorsPage() {
   const [totalSubcontractors, setTotalSubcontractors] = useState(0)
   const [selectedSubcontractor, setSelectedSubcontractor] = useState<ProfileWithStats | null>(null)
   const [viewMode, setViewMode] = useState<"table" | "card">("table")
+  const [deleteSubcontractor, setDeleteSubcontractor] = useState<ProfileWithStats | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const subcontractorsPerPage = 10
-  
+
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
@@ -91,29 +96,29 @@ export default function AdminSubcontractorsPage() {
   const loadSubcontractors = async () => {
     try {
       setLoading(true)
-      
+
       // First, get all subcontractor profiles
       let query = supabase
         .from('profiles')
         .select('*', { count: 'exact' })
         .eq('role', 'subcontractor')
         .order('company_name')
-      
+
       if (searchQuery) {
         query = query.or(`company_name.ilike.%${searchQuery}%,contact_person.ilike.%${searchQuery}%`)
       }
-      
+
       // Add pagination
       const from = (currentPage - 1) * subcontractorsPerPage
       const to = from + subcontractorsPerPage - 1
-      
+
       const { data: profilesData, error: profilesError, count } = await query
         .range(from, to)
-      
+
       if (profilesError) {
         throw profilesError
       }
-      
+
       if (profilesData) {
         // For each subcontractor, get job and invoice stats
         const enhancedProfiles = await Promise.all(
@@ -123,7 +128,7 @@ export default function AdminSubcontractorsPage() {
               .from('jobs')
               .select('id, status, total', { count: 'exact' })
               .eq('subcontractor_id', profile.id)
-            
+
             if (jobsError) {
               console.error('Error fetching jobs:', jobsError)
               return {
@@ -134,15 +139,15 @@ export default function AdminSubcontractorsPage() {
                 total_invoiced: 0
               }
             }
-            
+
             // Calculate job stats
             const job_count = jobsData?.length || 0
             const completed_jobs = jobsData?.filter(job => job.status === 'completed').length || 0
             const active_jobs = jobsData?.filter(job => job.status === 'in-progress').length || 0
-            
+
             // Calculate total invoiced amount
             const total_invoiced = jobsData?.reduce((sum, job) => sum + (job.total || 0), 0) || 0
-            
+
             return {
               ...profile,
               job_count,
@@ -152,7 +157,7 @@ export default function AdminSubcontractorsPage() {
             }
           })
         )
-        
+
         // Apply status filter if needed
         let filteredProfiles = enhancedProfiles
         if (statusFilter === "active") {
@@ -160,7 +165,7 @@ export default function AdminSubcontractorsPage() {
         } else if (statusFilter === "inactive") {
           filteredProfiles = enhancedProfiles.filter(profile => profile.active_jobs === 0)
         }
-        
+
         setSubcontractors(filteredProfiles)
         setTotalSubcontractors(count || 0)
       }
@@ -187,7 +192,7 @@ export default function AdminSubcontractorsPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-MY')
   }
-  
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-MY', {
       style: 'currency',
@@ -215,6 +220,54 @@ export default function AdminSubcontractorsPage() {
     setSelectedSubcontractor(subcontractor)
   }
 
+  const handleDeleteClick = (subcontractor: ProfileWithStats) => {
+    setDeleteSubcontractor(subcontractor)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    try {
+      if (!deleteSubcontractor) return
+
+      setIsDeleting(true)
+
+      const response = await fetch('/api/admin/subcontractors/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subcontractorId: deleteSubcontractor.id,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete subcontractor')
+      }
+
+      toast({
+        title: "Account deleted",
+        description: result.message || "The subcontractor account has been deleted successfully.",
+      })
+
+      // Reload the subcontractors list
+      loadSubcontractors()
+    } catch (error) {
+      console.error('Error deleting subcontractor:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete subcontractor. Please try again.",
+      })
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+      setDeleteSubcontractor(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -223,7 +276,7 @@ export default function AdminSubcontractorsPage() {
           View and manage all subcontractors in the system
         </p>
       </div>
-      
+
       {/* Wrap filters, view switcher, and content in Tabs */}
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "card")}>
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between mb-4"> {/* Added mb-4 */}
@@ -334,6 +387,14 @@ export default function AdminSubcontractorsPage() {
                               Contact via Phone
                             </a>
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteClick(subcontractor)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Account
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -348,7 +409,7 @@ export default function AdminSubcontractorsPage() {
           )}
         </div>
       </TabsContent>
-      
+
       <TabsContent value="card" className="mt-0">
         {loading ? (
           <div className="p-8 text-center">
@@ -411,7 +472,7 @@ export default function AdminSubcontractorsPage() {
           </div>
         )}
       </TabsContent>
-      
+
       {/* Pagination - Now inside the Tabs component */}
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6">
@@ -442,7 +503,7 @@ export default function AdminSubcontractorsPage() {
             <div className="hidden sm:flex items-center gap-1">
               {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
                 let pageNum = i + 1;
-                
+
                 // Show pages around current page if there are many pages
                 if (totalPages > 5) {
                   if (currentPage <= 3) {
@@ -453,7 +514,7 @@ export default function AdminSubcontractorsPage() {
                     pageNum = currentPage - 2 + i;
                   }
                 }
-                
+
                 return (
                   <Button
                     key={pageNum}
@@ -498,7 +559,7 @@ export default function AdminSubcontractorsPage() {
       {/* End Pagination */}
 
       </Tabs> {/* Closing the Tabs component started before the filters */}
-      
+
       {/* Subcontractor details dialog - Outside the Tabs component */}
       {selectedSubcontractor && (
         <Dialog open={!!selectedSubcontractor} onOpenChange={() => setSelectedSubcontractor(null)}>
@@ -561,7 +622,7 @@ export default function AdminSubcontractorsPage() {
             </div>
             <DialogFooter>
               <div className="flex gap-2">
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => setSelectedSubcontractor(null)}
                 >
@@ -578,6 +639,52 @@ export default function AdminSubcontractorsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Subcontractor Account</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the subcontractor&apos;s account and all associated data, including their profile details, submitted information, job history, and any other related records.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {deleteSubcontractor && (
+              <p className="text-sm font-medium text-destructive">
+                Are you sure you want to delete {deleteSubcontractor.company_name}?
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false)
+                setDeleteSubcontractor(null)
+              }}
+              disabled={isDeleting}
+              className="min-w-[100px] min-h-[40px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="min-w-[100px] min-h-[40px]"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...
+                </>
+              ) : (
+                "Delete Account"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
