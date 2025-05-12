@@ -14,10 +14,10 @@ export default function Home() {
         <div className="container flex flex-col items-center justify-center gap-4 px-4 text-center md:px-6 max-w-5xl">
           <div className="space-y-3">
             <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-              Streamline Your Subcontractor Work Management
+              Durafloor And Jayanexus Subcontractor Work Management System
             </h1>
             <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-              A comprehensive platform for subcontractors to submit jobs and administrators to manage and track the progress.
+              A comprehensive platform for our subcontractors to submit jobs and administrators to manage and track the progress of their work.
             </p>
           </div>
           <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -117,7 +117,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t mt-auto">
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} SubConMgmt. All rights reserved.
+          © {new Date().getFullYear()} SubConMgmt V1.0 (2025). Durafloor & Jayanexus. All rights reserved.
         </p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link
