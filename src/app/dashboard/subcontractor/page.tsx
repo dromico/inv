@@ -26,18 +26,20 @@ export default function SubcontractorDashboard() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
+    // Define the function inside useEffect
     async function loadDashboardData() {
-      try {        setLoading(true)
+      try {
+        setLoading(true)
         let userId = null;
 
         // Get current user with improved error handling
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        const { data, error: userError } = await supabase.auth.getUser()
 
         if (userError) {
           throw new Error(`Authentication error: ${userError.message}`);
         }
 
-        if (!user) {
+        if (!data || !data.user) {
           toast({
             variant: "destructive",
             title: "Authentication Error",
@@ -45,8 +47,10 @@ export default function SubcontractorDashboard() {
           })
           return
         }
-        userId = user.id;
-          // Fetch job stats
+
+        userId = data.user.id;
+
+        // Fetch job stats
         const { data: jobsData, error: jobsError } = await supabase
           .from('jobs')
           .select('*')
@@ -54,8 +58,12 @@ export default function SubcontractorDashboard() {
 
         if (jobsError) {
           throw new Error(`Error fetching jobs: ${jobsError.message}`);
-        }        // Always set data, even if null, to prevent state inconsistencies
+        }
+
+        // Always set data, even if null, to prevent state inconsistencies
         const jobsList = jobsData || [];
+
+        // Calculate job statistics
         const statsData = {
           totalJobs: jobsList.length,
           pendingJobs: jobsList.filter(job => job.status === 'pending').length,
@@ -64,23 +72,36 @@ export default function SubcontractorDashboard() {
         };
         setJobStats(statsData);
 
+        // Sort jobs by creation date and take the 5 most recent
         const sortedJobs = [...jobsList].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ).slice(0, 5);
-        setRecentJobs(sortedJobs);// Fetch notifications
-        const { data: notificationsData, error: notificationsError } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('recipient_id', userId)
-          .eq('read', false)
-          .order('created_at', { ascending: false })
-          .limit(5);
 
-        if (notificationsError) {
-          throw new Error(`Error fetching notifications: ${notificationsError.message}`);
-        }        // Always set notifications, empty array if null
-        setNotifications(notificationsData || []);
-          } catch (error) {
+        setRecentJobs(sortedJobs);
+
+        // Fetch notifications
+        try {
+          const { data: notificationsData, error: notificationsError } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('recipient_id', userId)
+            .eq('read', false)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          if (notificationsError) {
+            throw new Error(`Error fetching notifications: ${notificationsError.message}`);
+          }
+
+          // Always set notifications, empty array if null
+          setNotifications(notificationsData || []);
+        } catch (notificationError) {
+          // Handle notification errors separately to prevent dashboard from failing completely
+          console.error('Error loading notifications:', notificationError);
+          // Still set empty notifications to prevent undefined state
+          setNotifications([]);
+        }
+      } catch (error) {
         // Improve error handling by converting error to a readable string
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         console.error('Error loading dashboard data:', errorMessage);
@@ -88,13 +109,27 @@ export default function SubcontractorDashboard() {
           variant: "destructive",
           title: "Failed to load dashboard",
           description: "There was a problem loading your dashboard data. Please try again.",
-        })
+        });
+
+        // Set default values for states to prevent undefined errors
+        setJobStats({
+          totalJobs: 0,
+          pendingJobs: 0,
+          completedJobs: 0,
+          inProgressJobs: 0,
+        });
+        setRecentJobs([]);
+        setNotifications([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    loadDashboardData()
+    // Call the function and handle any uncaught errors
+    loadDashboardData().catch(error => {
+      console.error('Uncaught error in loadDashboardData:', error);
+      setLoading(false);
+    });
   }, [supabase, toast])
 
   const formatDate = (dateString: string) => {

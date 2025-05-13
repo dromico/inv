@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -305,15 +306,17 @@ export default function NewJobPage() {
                           <FormItem className="bg-muted/30 p-3 rounded-md">
                             <FormLabel className="text-sm font-medium">Unit Quantity</FormLabel>
                             <FormControl>
-                              <Input
-                                type="number"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              <NumericInput
+                                defaultPlaceholder="0"
+                                min={0}
+                                decimalPlaces={2}
+                                value={field.value}
+                                onValueChange={(value) => field.onChange(value ?? 0)}
                                 className="bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/30"
                               />
                             </FormControl>
                             <FormDescription className="text-xs mt-1">
-                              Number of units (hours, pieces, etc.)
+                              Number of units (hours, pieces, etc.) - can include decimals
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -325,22 +328,19 @@ export default function NewJobPage() {
                         render={({ field }) => (
                           <FormItem className="bg-muted/30 p-3 rounded-md">
                             <FormLabel className="text-sm font-medium">Unit Price (RM)</FormLabel>
-                            <div className="relative">
-                              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                <span className="text-muted-foreground">RM</span>
-                              </div>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  {...field}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  className="pl-10 bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/30"
-                                />
-                              </FormControl>
-                            </div>
+                            <FormControl>
+                              <NumericInput
+                                defaultPlaceholder="0"
+                                prefix="RM"
+                                min={0}
+                                decimalPlaces={2}
+                                value={field.value}
+                                onValueChange={(value) => field.onChange(value ?? 0)}
+                                className="bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/30"
+                              />
+                            </FormControl>
                             <FormDescription className="text-xs mt-1">
-                              Price per unit in Malaysian Ringgit
+                              Price per unit in Malaysian Ringgit (e.g. 5.20, 15.75)
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

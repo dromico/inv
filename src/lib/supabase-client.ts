@@ -2,5 +2,13 @@ import { createClientComponentClient as createSupabaseClientComponentClient } fr
 
 // Client-side Supabase client (to be used in client components)
 export function createClientComponentClient() {
-  return createSupabaseClientComponentClient()
+  return createSupabaseClientComponentClient({
+    options: {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    }
+  })
 }

@@ -8,6 +8,7 @@ type ToastType = {
   title?: ReactNode
   description?: ReactNode
   action?: ToastActionElement
+  duration?: number
 } & ToastProps
 
 type ToastContextProps = {

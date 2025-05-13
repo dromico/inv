@@ -59,12 +59,46 @@ export default function SignupPage() {
         password: data.password,
       })
 
+      // Handle authentication errors without throwing them
       if (authError) {
-        throw authError
+        // Handle specific authentication errors
+        let errorTitle = "Signup failed";
+        let errorMessage = "";
+
+        if (authError.message.includes("already registered")) {
+          errorTitle = "Email already in use";
+          errorMessage = "This email address is already registered. Please use a different email or try to log in.";
+        } else if (authError.message.includes("rate limit")) {
+          errorTitle = "Too many attempts";
+          errorMessage = "Too many signup attempts. Please try again later.";
+        } else if (authError.message.includes("weak password")) {
+          errorTitle = "Weak password";
+          errorMessage = "Please choose a stronger password. It should be at least 6 characters long.";
+        } else {
+          // For other error types, use the error message
+          errorMessage = authError.message;
+        }
+
+        toast({
+          variant: "destructive",
+          title: errorTitle,
+          description: errorMessage,
+          duration: 6000, // Show error messages for 6 seconds
+        });
+
+        setIsLoading(false);
+        return; // Exit early without throwing the error
       }
 
       if (!authData.user) {
-        throw new Error("User creation failed")
+        toast({
+          variant: "destructive",
+          title: "Signup failed",
+          description: "User creation failed. Please try again.",
+          duration: 6000,
+        });
+        setIsLoading(false);
+        return;
       }
 
       // Create a profile entry for the new user
@@ -93,20 +127,20 @@ export default function SignupPage() {
       router.push('/auth/signup-success')
 
     } catch (error: unknown) {
-      console.error('Signup error:', error)
+      // This catch block now only handles unexpected errors, not authentication errors
+      console.error('Unexpected signup error:', error)
 
-      const errorMessage = error instanceof Error
-        ? error.message
-        : "There was a problem creating your account. Please try again."
-
+      // For unexpected errors, show a generic message
       toast({
         variant: "destructive",
         title: "Signup failed",
-        description: errorMessage,
+        description: error instanceof Error
+          ? `An unexpected error occurred: ${error.message}`
+          : "An unexpected error occurred. Please try again.",
+        duration: 6000, // Show error messages for 6 seconds
       })
 
-      // Only set loading to false on error
-      // This keeps the button in loading state during redirect
+      // Set loading to false
       setIsLoading(false)
     }
   }

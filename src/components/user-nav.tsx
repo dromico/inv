@@ -31,36 +31,76 @@ export function UserNav() {
       [key: string]: unknown;
     };
   };
-  
+
   const [user, setUser] = useState<UserWithProfile | null>(null)
 
   // Fetch user data on component mount
   useEffect(() => {
     async function fetchUser() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        
-        if (profile) {
-          setUser({
-            ...user,
-            profile
-          })
+      try {
+        const { data, error } = await supabase.auth.getUser()
+
+        if (error) {
+          console.error("Error fetching user:", error);
+          return;
         }
+
+        if (data?.user) {
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .single()
+
+            if (profileError) {
+              console.error("Error fetching profile:", profileError);
+            }
+
+            if (profile) {
+              setUser({
+                ...data.user,
+                profile
+              })
+            } else {
+              // Still set the user even without profile
+              setUser(data.user)
+            }
+          } catch (profileFetchError) {
+            console.error("Error in profile fetch:", profileFetchError);
+            // Still set the user even if profile fetch fails
+            setUser(data.user)
+          }
+        }
+      } catch (error) {
+        console.error("Error in fetchUser:", error);
       }
     }
-    fetchUser()
+
+    // Call the function and handle any uncaught errors
+    fetchUser().catch(error => {
+      console.error('Uncaught error in fetchUser:', error);
+    });
   }, [supabase])
-  
+
   const handleSignOut = async () => {
     try {
       setIsLoading(true)
-      const { error } = await supabase.auth.signOut()
-      
+
+      // Clear any local storage items that might be related to the session
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.refreshToken');
+      } catch (e) {
+        console.log('Error clearing localStorage:', e);
+        // Continue even if localStorage clearing fails
+      }
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut({
+        scope: 'global' // Sign out from all devices
+      })
+
       if (error) {
         toast({
           variant: "destructive",
@@ -69,9 +109,16 @@ export function UserNav() {
         })
         return
       }
-      
-      router.push("/auth/login")
-      
+
+      // Redirect to login page
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      })
+
+      // Use replace instead of push to prevent back navigation to authenticated pages
+      router.replace("/auth/login")
+
     } catch (error) {
       console.error("Sign out error:", error)
       toast({

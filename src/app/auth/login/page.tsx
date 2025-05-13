@@ -59,14 +59,42 @@ function LoginContent() {
   async function onSubmit(data: FormValues) {
     try {
       setIsLoading(true)
-        // Sign in with email and password
+      // Sign in with email and password
       const signInResponse = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       })
 
+      // Handle authentication errors without throwing them
+      // This prevents the error from being logged to the console
       if (signInResponse.error) {
-        throw signInResponse.error
+        // Handle specific authentication errors
+        let errorTitle = "Login failed";
+        let errorMessage = "";
+
+        if (signInResponse.error.message.includes("Invalid login credentials")) {
+          errorTitle = "Invalid credentials";
+          errorMessage = "The email or password you entered is incorrect. Please try again.";
+        } else if (signInResponse.error.message.includes("Email not confirmed")) {
+          errorTitle = "Email not verified";
+          errorMessage = "Please check your email and follow the verification link before logging in.";
+        } else if (signInResponse.error.message.includes("rate limit")) {
+          errorTitle = "Too many attempts";
+          errorMessage = "Too many login attempts. Please try again later.";
+        } else {
+          // For other error types, use the error message
+          errorMessage = signInResponse.error.message;
+        }
+
+        toast({
+          variant: "destructive",
+          title: errorTitle,
+          description: errorMessage,
+          duration: 6000, // Show error messages for 6 seconds
+        });
+
+        setIsLoading(false);
+        return; // Exit early without throwing the error
       }
 
       // Get user data
@@ -158,20 +186,20 @@ function LoginContent() {
       }
 
     } catch (error: unknown) {
-      console.error('Login error:', error)
+      // This catch block now only handles unexpected errors, not authentication errors
+      console.error('Unexpected login error:', error)
 
-      const errorMessage = error instanceof Error
-        ? error.message
-        : "Invalid email or password. Please try again."
-
+      // For unexpected errors, show a generic message
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: errorMessage,
+        description: error instanceof Error
+          ? `An unexpected error occurred: ${error.message}`
+          : "An unexpected error occurred. Please try again.",
+        duration: 6000, // Show error messages for 6 seconds
       })
 
-      // Only set loading to false on error
-      // This keeps the button in loading state during redirect
+      // Set loading to false
       setIsLoading(false)
     }
   }

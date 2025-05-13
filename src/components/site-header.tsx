@@ -15,26 +15,56 @@ export function SiteHeader() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        setIsAuthenticated(!!session)
+        const { data, error } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("Error checking auth session:", error)
+          setIsAuthenticated(false)
+        } else {
+          setIsAuthenticated(!!data.session)
+        }
       } catch (error) {
         console.error("Error checking auth status:", error)
+        setIsAuthenticated(false)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAuth()
+    // Call the function and handle any uncaught errors
+    checkAuth().catch(error => {
+      console.error('Uncaught error in checkAuth:', error)
+      setIsLoading(false)
+      setIsAuthenticated(false)
+    })
 
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setIsAuthenticated(!!session)
+    // Set up auth state change listener with error handling
+    let subscription: { unsubscribe: () => void } | null = null
+
+    try {
+      const { data, error } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          setIsAuthenticated(!!session)
+        }
+      )
+
+      if (error) {
+        console.error("Error setting up auth state listener:", error)
+      } else {
+        subscription = data.subscription
       }
-    )
+    } catch (error) {
+      console.error("Error in auth state change setup:", error)
+    }
 
     return () => {
-      subscription.unsubscribe()
+      if (subscription) {
+        try {
+          subscription.unsubscribe()
+        } catch (error) {
+          console.error("Error unsubscribing from auth state changes:", error)
+        }
+      }
     }
   }, [supabase])
 
