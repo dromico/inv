@@ -9,7 +9,7 @@ import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 export default function AdminTools() {
-  const [email, setEmail] = useState('romico@gmail.com')
+  const [email, setEmail] = useState('subcontractor@email.com')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
   const { toast } = useToast()
@@ -118,9 +118,9 @@ export default function AdminTools() {
         
         <CardContent className="space-y-6">
           <div>
-            <h3 className="text-lg font-medium mb-2">Fix romico@gmail.com Admin</h3>
+            <h3 className="text-lg font-medium mb-2">Fix durafloor@hotmail.com Admin</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              This will ensure romico@gmail.com has the admin role in the profiles table.
+              This will ensure durafloor@hotmail.com has the admin role in the profiles table.
             </p>
             
             <Button 
@@ -134,7 +134,7 @@ export default function AdminTools() {
                   Fixing...
                 </>
               ) : (
-                'Fix romico@gmail.com Admin Role'
+                'Fix durafloor@hotmail.com Admin Role'
               )}
             </Button>
           </div>
