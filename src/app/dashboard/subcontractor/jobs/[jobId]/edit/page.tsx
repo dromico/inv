@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { NumberInput } from "@/components/ui/number-input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -442,10 +443,13 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                           <FormItem className="bg-muted/30 p-3 rounded-md">
                             <FormLabel className="text-sm font-medium">Unit Quantity</FormLabel>
                             <FormControl>
-                              <Input
-                                type="number"
+                              <NumberInput
                                 {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                value={field.value}
+                                onChange={(e) => {
+                                  const value = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                  field.onChange(value);
+                                }}
                                 className="bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/30"
                               />
                             </FormControl>
@@ -467,11 +471,14 @@ export default function EditJobPage({ params }: EditJobPageProps) {
                                 <span className="text-muted-foreground">RM</span>
                               </div>
                               <FormControl>
-                                <Input
-                                  type="number"
+                                <NumberInput
                                   step="0.01"
                                   {...field}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  value={field.value}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+                                    field.onChange(value);
+                                  }}
                                   className="pl-10 bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/30"
                                 />
                               </FormControl>
