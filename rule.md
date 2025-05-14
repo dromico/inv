@@ -25,3 +25,4 @@ When using Context7 for documentation retrieval:
 - Keep `library.md` organized and up-to-date
 - Include timestamp of when Library IDs were last used/verified
 - Remove outdated or unused Library IDs periodically
+- Ask user if unsure
