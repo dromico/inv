@@ -34,7 +34,7 @@ function RecentActivityList() {
     const fetchRecentActivity = async () => {
       try {
         setActivityLoading(true)
-        
+
         // Fetch recent jobs
         const { data: recentJobs, error: jobsError } = await supabase
           .from('jobs')
@@ -48,9 +48,9 @@ function RecentActivityList() {
           `)
           .order('created_at', { ascending: false })
           .limit(3)
-        
+
         if (jobsError) throw jobsError
-        
+
         // Fetch recent invoices
         const { data: recentInvoices, error: invoicesError } = await supabase
           .from('invoices')
@@ -67,16 +67,16 @@ function RecentActivityList() {
           `)
           .order('created_at', { ascending: false })
           .limit(3)
-        
+
         if (invoicesError) throw new Error(`Error fetching invoices: ${invoicesError.message}`)
-        
+
         // Transform jobs into activities
         const jobActivities: Activity[] = (recentJobs || []).map(job => {
           // Handle profiles as an array or single object
           const profile = Array.isArray(job.profiles)
             ? job.profiles[0]
             : job.profiles;
-            
+
           return {
             id: `job-${job.id}`,
             type: 'job',
@@ -90,7 +90,7 @@ function RecentActivityList() {
             } : undefined
           };
         });
-        
+
         // Transform invoices into activities
         const invoiceActivities: Activity[] = (recentInvoices || []).map(invoice => {
           // Handle jobs and profiles data structure
@@ -98,7 +98,7 @@ function RecentActivityList() {
           const profile = job && job.profiles ?
             (Array.isArray(job.profiles) ? job.profiles[0] : job.profiles)
             : undefined;
-            
+
           return {
             id: `invoice-${invoice.id}`,
             type: 'invoice',
@@ -115,14 +115,14 @@ function RecentActivityList() {
             } : undefined
           };
         });
-        
+
         // Combine and sort activities by timestamp
         let allActivities = [...jobActivities, ...invoiceActivities]
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
           .slice(0, 5)
-        
+
         // Display only real activities, no fallbacks
-        
+
         setActivities(allActivities)      } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         console.error('Error fetching recent activity:', errorMessage)
@@ -135,10 +135,10 @@ function RecentActivityList() {
         setActivityLoading(false)
       }
     }
-    
+
     fetchRecentActivity()
   }, [supabase, toast])
-  
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp)
     const now = new Date()
@@ -146,7 +146,7 @@ function RecentActivityList() {
     const diffMins = Math.round(diffMs / 60000)
     const diffHours = Math.round(diffMs / 3600000)
     const diffDays = Math.round(diffMs / 86400000)
-    
+
     if (diffMins < 60) {
       return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
     } else if (diffHours < 24) {
@@ -155,10 +155,10 @@ function RecentActivityList() {
       return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
     }
   }
-  
+
   const getStatusBadge = (type: string, status?: string) => {
     if (!status) return null
-    
+
     if (type === 'job') {
       return (
         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -180,10 +180,10 @@ function RecentActivityList() {
         </div>
       )
     }
-    
+
     return null
   }
-  
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'job':
@@ -196,7 +196,7 @@ function RecentActivityList() {
         return <div className="bg-gray-100 p-2 rounded-full"><Settings className="h-4 w-4 text-gray-600" /></div>
     }
   }
-  
+
   if (activityLoading) {
     return (
       <div className="space-y-2">
@@ -206,7 +206,7 @@ function RecentActivityList() {
       </div>
     )
   }
-  
+
   if (activities.length === 0) {
     return (
       <div className="p-8 text-center">
@@ -214,7 +214,7 @@ function RecentActivityList() {
       </div>
     )
   }
-  
+
   return (
     <div className="space-y-2">
       {activities.map((activity) => (
@@ -255,48 +255,48 @@ export default function AdminDashboardPage() {
     recentInvoiceAmount: 0
   })
   const [loading, setLoading] = useState(true)
-  
+
   const { toast } = useToast()
   const supabase = createClientComponentClient()
-  
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
-        
+
         // Get jobs count
         const { count: totalJobs, error: jobsError } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true })
-        
+
         if (jobsError) throw jobsError
-        
+
         // Get pending jobs count
         const { count: pendingJobs, error: pendingError } = await supabase
           .from('jobs')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending')
-        
+
         if (pendingError) throw new Error(`Error fetching pending job count: ${pendingError.message}`)
-        
+
         // Get subcontractors count (excluding admin users)
         const { count: totalSubcontractors, error: subError } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
-        
+
         if (subError) throw new Error(`Error fetching subcontractor count: ${subError.message}`)
-        
+
         // Get recent invoice total
         const { data: invoices, error: invError } = await supabase
           .from('invoices')
           .select('amount')
           .order('created_at', { ascending: false })
           .limit(5)
-        
+
         if (invError) throw new Error(`Error fetching invoice data: ${invError.message}`)
-        
+
         const recentInvoiceAmount = invoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-        
+
         setStats({
           totalJobs: totalJobs || 0,
           pendingJobs: pendingJobs || 0,
@@ -315,11 +315,12 @@ export default function AdminDashboardPage() {
         setLoading(false)
       }
     }
-    
+
     fetchDashboardData()
   }, [supabase, toast])
   return (
-    <div className="space-y-6">      <div className="flex justify-between items-start">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-muted-foreground">
@@ -341,7 +342,7 @@ export default function AdminDashboardPage() {
           </Button>
         </div>
       </div>
-      
+
       <div className="grid gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -355,7 +356,7 @@ export default function AdminDashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Jobs</CardTitle>
@@ -368,7 +369,7 @@ export default function AdminDashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Subcontractors</CardTitle>
@@ -381,7 +382,7 @@ export default function AdminDashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Recent Invoices</CardTitle>
@@ -401,7 +402,7 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card className="col-span-1">
           <CardHeader>
@@ -411,7 +412,7 @@ export default function AdminDashboardPage() {
           <CardContent className="space-y-8">
             <div className="space-y-4">
               <h4 className="text-sm font-semibold">Recent Activity</h4>
-              
+
               {loading ? (
                 <div className="space-y-2">
                   {Array(5).fill(0).map((_, i) => (
@@ -421,7 +422,7 @@ export default function AdminDashboardPage() {
               ) : (
                 <RecentActivityList />
               )}
-              
+
               <div className="flex flex-col sm:flex-row justify-end gap-2">
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/dashboard/admin/jobs">
@@ -437,7 +438,7 @@ export default function AdminDashboardPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>

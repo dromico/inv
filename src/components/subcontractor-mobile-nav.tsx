@@ -22,14 +22,14 @@ export function SubcontractorMobileNav() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden">
+        <Button variant="ghost" size="icon" className="md:hidden h-10 w-10 min-h-[40px] min-w-[40px]">
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[240px] sm:w-[300px]">
-        <SheetHeader>
-          <SheetTitle>Subcontractor Portal</SheetTitle>
+      <SheetContent side="left" className="w-[280px] sm:w-[320px]">
+        <SheetHeader className="py-2">
+          <SheetTitle className="text-lg">Subcontractor Portal</SheetTitle>
         </SheetHeader>
         <div className="py-4">
           <DashboardNav onNavItemClick={handleNavItemClick} />
