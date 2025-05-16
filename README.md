@@ -1,4 +1,4 @@
-# Subcontractor Work Management System
+# AN Awesome Subcontractor Work Management System
 
 A comprehensive system for managing subcontractor jobs, invoices, and payments. Built with Next.js and Supabase.
 
