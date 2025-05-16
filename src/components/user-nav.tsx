@@ -31,7 +31,7 @@ export function UserNav() {
       [key: string]: unknown;
     };
   };
-  
+
   const [user, setUser] = useState<UserWithProfile | null>(null)
 
   // Fetch user data on component mount
@@ -44,7 +44,7 @@ export function UserNav() {
           .select('*')
           .eq('id', user.id)
           .single()
-        
+
         if (profile) {
           setUser({
             ...user,
@@ -55,12 +55,12 @@ export function UserNav() {
     }
     fetchUser()
   }, [supabase])
-  
+
   const handleSignOut = async () => {
     try {
       setIsLoading(true)
       const { error } = await supabase.auth.signOut()
-      
+
       if (error) {
         toast({
           variant: "destructive",
@@ -69,9 +69,9 @@ export function UserNav() {
         })
         return
       }
-      
+
       router.push("/auth/login")
-      
+
     } catch (error) {
       console.error("Sign out error:", error)
       toast({
@@ -86,13 +86,13 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 hover:bg-accent p-2 rounded-md">
+        <button className="flex items-center gap-2 hover:bg-accent p-2 rounded-md min-h-[44px] min-w-[44px]">
           <span className="hidden md:inline-block">
             {user?.email === "romico@gmail.com"
               ? "Admin"
               : user?.profile?.contact_person || user?.profile?.company_name || user?.email || "User"}
           </span>
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-9 w-9">
             <AvatarFallback>
               {user?.email === "romico@gmail.com"
                 ? "A"
@@ -126,7 +126,7 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="cursor-pointer"
+          className="cursor-pointer h-10 min-h-[40px]"
           disabled={isLoading}
           onClick={handleSignOut}
         >
