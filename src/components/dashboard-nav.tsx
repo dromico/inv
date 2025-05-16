@@ -23,11 +23,7 @@ const navItems = [
     href: "/dashboard/subcontractor/jobs",
     icon: ListTodo,
   },
-  {
-    title: "Invoices",
-    href: "/dashboard/subcontractor/invoices",
-    icon: FileText,
-  },
+  // Removed the Invoices item
   {
     title: "Notifications",
     href: "/dashboard/subcontractor/notifications",
