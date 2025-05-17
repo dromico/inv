@@ -4,26 +4,33 @@ import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 
 export async function POST(request: NextRequest) {
+  console.log('API: Notification delete request received');
   try {
     // Initialize Supabase client
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    console.log('API: Supabase client initialized');
     
     // Get the current authenticated user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ 
-        success: false, 
+      console.log('API: Authentication error', userError);
+      return NextResponse.json({
+        success: false,
         message: 'Authentication required',
       }, { status: 401 });
     }
+    console.log('API: User authenticated', user.id);
     
     // Parse the request body
-    const { notificationId } = await request.json();
+    const body = await request.json();
+    const { notificationId } = body;
+    console.log('API: Request body parsed', { notificationId });
     
     if (!notificationId) {
-      return NextResponse.json({ 
-        success: false, 
+      console.log('API: Missing notification ID');
+      return NextResponse.json({
+        success: false,
         message: 'Notification ID is required',
       }, { status: 400 });
     }
@@ -36,36 +43,40 @@ export async function POST(request: NextRequest) {
       .single();
     
     if (notificationError) {
-      console.error('Error fetching notification:', notificationError);
-      return NextResponse.json({ 
-        success: false, 
+      console.error('API: Error fetching notification:', notificationError);
+      return NextResponse.json({
+        success: false,
         message: 'Notification not found',
       }, { status: 404 });
     }
+    console.log('API: Notification found', notification);
     
     if (notification.recipient_id !== user.id) {
-      return NextResponse.json({ 
-        success: false, 
+      console.log('API: Permission denied - notification belongs to', notification.recipient_id);
+      return NextResponse.json({
+        success: false,
         message: 'You do not have permission to delete this notification',
       }, { status: 403 });
     }
     
     // Delete the notification
+    console.log('API: Attempting to delete notification', notificationId);
     const { error: deleteError } = await supabase
       .from('notifications')
       .delete()
       .eq('id', notificationId);
     
     if (deleteError) {
-      console.error('Error deleting notification:', deleteError);
-      return NextResponse.json({ 
-        success: false, 
+      console.error('API: Error deleting notification:', deleteError);
+      return NextResponse.json({
+        success: false,
         message: `Database error: ${deleteError.message}`,
       }, { status: 500 });
     }
     
-    return NextResponse.json({ 
-      success: true, 
+    console.log('API: Notification deleted successfully');
+    return NextResponse.json({
+      success: true,
       message: 'Notification deleted successfully',
     });
   } catch (error) {

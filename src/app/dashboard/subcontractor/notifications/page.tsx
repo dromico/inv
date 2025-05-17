@@ -44,14 +44,22 @@ export default function SubcontractorNotificationsPage() {
       }
 
       // Try to fetch real notifications from the database
+      console.log('Fetching real notifications for user:', user.id);
       let { data: realNotifications, error: fetchError } = await supabase
         .from('notifications')
         .select('*')
         .eq('recipient_id', user.id)
         .order('created_at', { ascending: false })
 
+      console.log('Fetch result:', {
+        count: realNotifications?.length || 0,
+        error: fetchError ? fetchError.message : null,
+        notifications: realNotifications
+      });
+
       // If we have real notifications and no error, use them
       if (realNotifications && realNotifications.length > 0 && !fetchError) {
+        console.log('Using real notifications from database');
         setNotifications(realNotifications as Notification[])
         setLoading(false)
         return
@@ -161,9 +169,12 @@ export default function SubcontractorNotificationsPage() {
       ]
 
       // Filter out any mock notifications that have been deleted
+      console.log('Current deletedMockIds before filtering:', deletedMockIds)
       const filteredMockNotifications = mockNotifications.filter(
         notification => !deletedMockIds.includes(notification.id)
       )
+      console.log('Mock notifications before filtering:', mockNotifications.length)
+      console.log('Mock notifications after filtering:', filteredMockNotifications.length)
 
       setNotifications(filteredMockNotifications)
     } catch (error) {
@@ -182,8 +193,10 @@ export default function SubcontractorNotificationsPage() {
   useEffect(() => {
     try {
       const storedIds = localStorage.getItem('deletedMockNotificationIds')
+      console.log('Retrieved from localStorage:', storedIds)
       if (storedIds) {
         const deletedIds = JSON.parse(storedIds)
+        console.log('Parsed deletedIds:', deletedIds)
         setDeletedMockIds(deletedIds)
       }
     } catch (error) {
@@ -197,6 +210,8 @@ export default function SubcontractorNotificationsPage() {
 
   const deleteNotification = async (notificationId: string) => {
     try {
+      console.log('Attempting to delete notification:', notificationId)
+      
       // Update the state immediately for better UX (optimistic update)
       setNotifications(notifications.map(notification =>
         notification.id === notificationId
@@ -206,44 +221,62 @@ export default function SubcontractorNotificationsPage() {
 
       // After a short delay, actually remove from the state
       setTimeout(() => {
-        setNotifications(notifications.filter(notification => notification.id !== notificationId))
+        setNotifications(prevNotifications =>
+          prevNotifications.filter(notification => notification.id !== notificationId)
+        )
       }, 500) // 500ms delay for animation to complete
 
       // For mock notifications (those without hyphens), track them as deleted
       if (!notificationId.includes('-')) {
+        console.log('Deleting mock notification:', notificationId)
+        
         // Store the deleted mock notification ID in local state
-        setDeletedMockIds(prev => [...prev, notificationId])
+        setDeletedMockIds(prev => {
+          const newDeletedIds = [...prev, notificationId];
+          console.log('Updated deletedMockIds state:', newDeletedIds);
+          return newDeletedIds;
+        })
 
         // Also store in localStorage to persist across page refreshes
         try {
           // Get existing deleted IDs from localStorage
           const storedIds = localStorage.getItem('deletedMockNotificationIds')
           const deletedIds = storedIds ? JSON.parse(storedIds) : []
+          console.log('Current localStorage deletedIds:', deletedIds)
 
           // Add the new ID if it's not already in the list
           if (!deletedIds.includes(notificationId)) {
             deletedIds.push(notificationId)
             localStorage.setItem('deletedMockNotificationIds', JSON.stringify(deletedIds))
+            console.log('Updated localStorage with new deletedIds:', deletedIds)
           }
         } catch (storageError) {
           console.error('Error storing deleted notification ID in localStorage:', storageError)
         }
       } else {
         // For real notifications (with hyphens), delete from the database
-        const response = await fetch('/api/notifications/delete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            notificationId: notificationId,
-          }),
-        })
+        console.log('Deleting real notification via API:', notificationId)
+        
+        try {
+          const response = await fetch('/api/notifications/delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              notificationId: notificationId,
+            }),
+          })
 
-        const result = await response.json()
+          const result = await response.json()
+          console.log('API response:', response.status, result)
 
-        if (!response.ok) {
-          throw new Error(result.message || 'Failed to delete notification')
+          if (!response.ok) {
+            throw new Error(result.message || 'Failed to delete notification')
+          }
+        } catch (apiError) {
+          console.error('API request error:', apiError)
+          throw apiError
         }
       }
 
