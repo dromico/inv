@@ -5,7 +5,7 @@ import { createClientComponentClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Bell, CheckCircle, DollarSign, FileText, AlertTriangle } from "lucide-react"
+import { Bell, DollarSign, FileText, AlertTriangle, Trash2 } from "lucide-react"
 
 // Define notification types
 interface Notification {
@@ -27,6 +27,7 @@ interface Notification {
 export default function SubcontractorNotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletedMockIds, setDeletedMockIds] = useState<string[]>([])
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
@@ -159,7 +160,12 @@ export default function SubcontractorNotificationsPage() {
         }
       ]
 
-      setNotifications(mockNotifications)
+      // Filter out any mock notifications that have been deleted
+      const filteredMockNotifications = mockNotifications.filter(
+        notification => !deletedMockIds.includes(notification.id)
+      )
+
+      setNotifications(filteredMockNotifications)
     } catch (error) {
       console.error('Error loading notifications:', error)
       toast({
@@ -170,71 +176,95 @@ export default function SubcontractorNotificationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, toast])
+  }, [supabase, toast, deletedMockIds])
+
+  // Load deleted mock notification IDs from localStorage on component mount
+  useEffect(() => {
+    try {
+      const storedIds = localStorage.getItem('deletedMockNotificationIds')
+      if (storedIds) {
+        const deletedIds = JSON.parse(storedIds)
+        setDeletedMockIds(deletedIds)
+      }
+    } catch (error) {
+      console.error('Error loading deleted notification IDs from localStorage:', error)
+    }
+  }, [])
 
   useEffect(() => {
     loadNotifications()
   }, [loadNotifications])
 
-  const markAsRead = async (notificationId: string) => {
+  const deleteNotification = async (notificationId: string) => {
     try {
-      // Update the state immediately for better UX
+      // Update the state immediately for better UX (optimistic update)
       setNotifications(notifications.map(notification =>
         notification.id === notificationId
-          ? { ...notification, read: true }
+          ? { ...notification, deleted: true }
           : notification
       ))
 
-      // Try to update the database if it's a real notification (has a UUID format)
-      if (notificationId.includes('-')) {
-        const { error } = await supabase
-          .from('notifications')
-          .update({ read: true })
-          .eq('id', notificationId)
+      // After a short delay, actually remove from the state
+      setTimeout(() => {
+        setNotifications(notifications.filter(notification => notification.id !== notificationId))
+      }, 500) // 500ms delay for animation to complete
 
-        if (error) {
-          throw error
+      // For mock notifications (those without hyphens), track them as deleted
+      if (!notificationId.includes('-')) {
+        // Store the deleted mock notification ID in local state
+        setDeletedMockIds(prev => [...prev, notificationId])
+
+        // Also store in localStorage to persist across page refreshes
+        try {
+          // Get existing deleted IDs from localStorage
+          const storedIds = localStorage.getItem('deletedMockNotificationIds')
+          const deletedIds = storedIds ? JSON.parse(storedIds) : []
+
+          // Add the new ID if it's not already in the list
+          if (!deletedIds.includes(notificationId)) {
+            deletedIds.push(notificationId)
+            localStorage.setItem('deletedMockNotificationIds', JSON.stringify(deletedIds))
+          }
+        } catch (storageError) {
+          console.error('Error storing deleted notification ID in localStorage:', storageError)
+        }
+      } else {
+        // For real notifications (with hyphens), delete from the database
+        const response = await fetch('/api/notifications/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            notificationId: notificationId,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to delete notification')
         }
       }
 
       toast({
-        title: "Notification marked as read",
-        description: "The notification has been marked as read.",
+        title: "Notification deleted",
+        description: "The notification has been deleted.",
       })
     } catch (error) {
-      console.error('Error marking notification as read:', error)
+      console.error('Error deleting notification:', error)
 
       // Revert the state change if there was an error
       setNotifications(notifications.map(notification =>
         notification.id === notificationId
-          ? { ...notification, read: false }
+          ? { ...notification, deleted: false }
           : notification
       ))
 
       toast({
         variant: "destructive",
-        title: "Failed to update notification",
-        description: "There was a problem updating the notification. Please try again.",
-      })
-    }
-  }
-
-  const markAllAsRead = async () => {
-    try {
-      // In a real implementation, you would update the database
-      // For now, we'll just update the state
-      setNotifications(notifications.map(notification => ({ ...notification, read: true })))
-
-      toast({
-        title: "All notifications marked as read",
-        description: "All notifications have been marked as read.",
-      })
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error)
-      toast({
-        variant: "destructive",
-        title: "Failed to update notifications",
-        description: "There was a problem updating the notifications. Please try again.",
+        title: "Failed to delete notification",
+        description: "There was a problem deleting the notification. Please try again.",
       })
     }
   }
@@ -256,18 +286,30 @@ export default function SubcontractorNotificationsPage() {
     }
   }
 
+  // Utility function to highlight the word "Paid" in payment notifications
+  const highlightPaidText = (message: string) => {
+    if (!message.includes('Paid') && !message.includes('paid')) {
+      return message
+    }
+
+    // Use regex to find the word "Paid" or "paid" and wrap it in a span with green text
+    return message.replace(/(Paid|paid)/g, match => (
+      `<span class="text-emerald-600 font-medium">${match}</span>`
+    ))
+  }
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'job_update':
-        return <div className="bg-blue-100 p-2 rounded-full"><Bell className="h-4 w-4 text-blue-600" /></div>
+        return <div className="bg-blue-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><Bell className="h-4 w-4 text-blue-600" /></div>
       case 'invoice_status':
-        return <div className="bg-green-100 p-2 rounded-full"><FileText className="h-4 w-4 text-green-600" /></div>
+        return <div className="bg-green-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><FileText className="h-4 w-4 text-green-600" /></div>
       case 'payment_processed':
-        return <div className="bg-emerald-100 p-2 rounded-full"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
+        return <div className="bg-emerald-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
       case 'system':
-        return <div className="bg-amber-100 p-2 rounded-full"><Bell className="h-4 w-4 text-amber-600" /></div>
+        return <div className="bg-amber-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><Bell className="h-4 w-4 text-amber-600" /></div>
       default:
-        return <div className="bg-gray-100 p-2 rounded-full"><Bell className="h-4 w-4 text-gray-600" /></div>
+        return <div className="bg-gray-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><Bell className="h-4 w-4 text-gray-600" /></div>
     }
   }
 
@@ -285,12 +327,6 @@ export default function SubcontractorNotificationsPage() {
             Stay updated with your latest activity
           </p>
         </div>
-        {notifications.some(n => !n.read) && (
-          <Button variant="outline" onClick={markAllAsRead}>
-            <CheckCircle className="mr-2 h-4 w-4" />
-            Mark all as read
-          </Button>
-        )}
       </div>
 
       <div className="rounded-md border">
@@ -299,7 +335,7 @@ export default function SubcontractorNotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 flex items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'}`}
+                className={`p-4 md:p-4 flex flex-col md:flex-row items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'} transition-all duration-300 opacity-100 animate-fadeIn`}
               >
                 {getNotificationIcon(notification.type)}
                 <div className="flex-1">
@@ -317,7 +353,11 @@ export default function SubcontractorNotificationsPage() {
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {notification.message}
+                    {notification.type === 'payment_processed' || notification.type === 'invoice_status' ? (
+                      <span dangerouslySetInnerHTML={{ __html: highlightPaidText(notification.message) }} />
+                    ) : (
+                      notification.message
+                    )}
                   </p>
                   {notification.type === 'payment_processed' && notification.job?.paid && (
                     <div className="mt-2 flex items-center">
@@ -328,29 +368,31 @@ export default function SubcontractorNotificationsPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col gap-2">
-                  {!notification.read && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => markAsRead(notification.id)}
-                      className="self-start"
-                    >
-                      Mark as read
-                    </Button>
-                  )}
-                  {(notification.type === 'payment_processed' || notification.type === 'job_update') && notification.job && (
+                <div className="flex flex-col gap-2 min-w-[100px] w-full md:w-auto mt-3 md:mt-0 border-t md:border-t-0 pt-3 md:pt-0">
+                  <div className="flex gap-2 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="self-start"
-                      asChild
+                      onClick={() => deleteNotification(notification.id)}
+                      className="h-10 px-4 min-w-[44px] transition-colors hover:bg-destructive/10 touch-manipulation"
                     >
-                      <a href={`/dashboard/subcontractor/jobs/${notification.job.id}`}>
-                        View Job
-                      </a>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
                     </Button>
-                  )}
+
+                    {(notification.type === 'payment_processed' || notification.type === 'job_update') && notification.job && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-4 min-w-[44px] touch-manipulation"
+                        asChild
+                      >
+                        <a href={`/dashboard/subcontractor/jobs/${notification.job.id}`}>
+                          View Job
+                        </a>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -376,17 +418,26 @@ function NotificationsLoadingSkeleton() {
             Stay updated with your latest activity
           </p>
         </div>
-        <Skeleton className="h-10 w-[150px]" />
       </div>
 
       <div className="rounded-md border">
         <div className="p-1">
           {Array(5).fill(null).map((_, i) => (
-            <div key={i} className="flex items-start gap-4 p-4 border-t first:border-t-0">
-              <Skeleton className="h-8 w-8 rounded-full" />
-              <div className="flex-1 space-y-2">
+            <div key={i} className="flex flex-col md:flex-row items-start gap-4 p-4 border-t first:border-t-0">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2 w-full">
+                <div className="flex justify-between items-start">
+                  <Skeleton className="h-5 w-1/3" />
+                  <Skeleton className="h-4 w-[60px]" />
+                </div>
+                <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-full" />
+              </div>
+              <div className="flex flex-col gap-2 min-w-[100px] w-full md:w-auto mt-3 md:mt-0 border-t md:border-t-0 pt-3 md:pt-0">
+                <div className="flex gap-2">
+                  <Skeleton className="h-10 w-[100px]" />
+                  <Skeleton className="h-10 w-[100px]" />
+                </div>
               </div>
             </div>
           ))}
