@@ -125,6 +125,7 @@ export type Database = {
           line_items: Json | null
           location: string
           notes: string | null
+          paid: boolean | null // Whether payment has been processed for completed jobs
           start_date: string | null // Corrected based on schema
           status: Database["public"]["Enums"]["job_status"] | null // Corrected based on schema
           subcontractor_id: string
@@ -141,6 +142,7 @@ export type Database = {
           line_items?: Json | null
           location: string
           notes?: string | null
+          paid?: boolean | null // Whether payment has been processed for completed jobs
           start_date?: string | null // Corrected based on schema
           status?: Database["public"]["Enums"]["job_status"] | null // Corrected based on schema
           subcontractor_id: string
@@ -157,6 +159,7 @@ export type Database = {
           line_items?: Json | null
           location?: string
           notes?: string | null
+          paid?: boolean | null // Whether payment has been processed for completed jobs
           start_date?: string | null // Corrected based on schema
           status?: Database["public"]["Enums"]["job_status"] | null // Corrected based on schema
           subcontractor_id?: string

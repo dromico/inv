@@ -5,7 +5,7 @@ import { createClientComponentClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Bell, CheckCircle, Users, FileText, AlertTriangle } from "lucide-react"
+import { Bell, CheckCircle, Users, FileText, AlertTriangle, DollarSign } from "lucide-react"
 
 // Define notification types
 interface Notification {
@@ -13,12 +13,18 @@ interface Notification {
   user_id: string
   title: string
   message: string
-  type: 'job_submission' | 'invoice_request' | 'system' | 'alert'
+  type: 'job_submission' | 'invoice_request' | 'system' | 'alert' | 'payment_processed'
   read: boolean
   created_at: string
   subcontractor?: {
     id: string
     name: string
+  }
+  job?: {
+    id: string
+    job_type: string
+    status: string
+    paid: boolean
   }
 }
 
@@ -31,15 +37,15 @@ export default function AdminNotificationsPage() {
   const loadNotifications = useCallback(async () => {
     try {
       setLoading(true)
-      
+
       // Get the current user
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         setLoading(false)
         return
       }
-      
+
       // For now, we'll use mock data since the notifications table might not exist yet
       // In a real implementation, you would fetch from the database
       const mockNotifications: Notification[] = [
@@ -54,6 +60,12 @@ export default function AdminNotificationsPage() {
           subcontractor: {
             id: "sub-1",
             name: "ABC Construction"
+          },
+          job: {
+            id: "job-1",
+            job_type: "Electrical Work",
+            status: "pending",
+            paid: false
           }
         },
         {
@@ -67,6 +79,12 @@ export default function AdminNotificationsPage() {
           subcontractor: {
             id: "sub-2",
             name: "XYZ Contractors"
+          },
+          job: {
+            id: "job-2",
+            job_type: "Plumbing Repair",
+            status: "completed",
+            paid: false
           }
         },
         {
@@ -111,10 +129,54 @@ export default function AdminNotificationsPage() {
           subcontractor: {
             id: "sub-1",
             name: "ABC Construction"
+          },
+          job: {
+            id: "job-3",
+            job_type: "Roof Repair",
+            status: "completed",
+            paid: false
+          }
+        },
+        {
+          id: "7",
+          user_id: user.id,
+          title: "Payment Processed",
+          message: "Payment for job #JOB-2023-039 has been processed and marked as paid.",
+          type: "payment_processed",
+          read: false,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 1).toISOString(), // 1 hour ago
+          subcontractor: {
+            id: "sub-2",
+            name: "XYZ Contractors"
+          },
+          job: {
+            id: "job-4",
+            job_type: "Bathroom Renovation",
+            status: "completed",
+            paid: true
+          }
+        },
+        {
+          id: "8",
+          user_id: user.id,
+          title: "Payment Processed",
+          message: "Payment for job #JOB-2023-045 has been processed and marked as paid.",
+          type: "payment_processed",
+          read: false,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
+          subcontractor: {
+            id: "sub-1",
+            name: "ABC Construction"
+          },
+          job: {
+            id: "job-5",
+            job_type: "Kitchen Remodeling",
+            status: "completed",
+            paid: true
           }
         }
       ]
-      
+
       setNotifications(mockNotifications)
     } catch (error) {
       console.error('Error loading notifications:', error)
@@ -127,7 +189,7 @@ export default function AdminNotificationsPage() {
       setLoading(false)
     }
   }, [supabase, toast])
-  
+
   useEffect(() => {
     loadNotifications()
   }, [loadNotifications])
@@ -136,12 +198,12 @@ export default function AdminNotificationsPage() {
     try {
       // In a real implementation, you would update the database
       // For now, we'll just update the state
-      setNotifications(notifications.map(notification => 
-        notification.id === notificationId 
-          ? { ...notification, read: true } 
+      setNotifications(notifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
           : notification
       ))
-      
+
       toast({
         title: "Notification marked as read",
         description: "The notification has been marked as read.",
@@ -161,7 +223,7 @@ export default function AdminNotificationsPage() {
       // In a real implementation, you would update the database
       // For now, we'll just update the state
       setNotifications(notifications.map(notification => ({ ...notification, read: true })))
-      
+
       toast({
         title: "All notifications marked as read",
         description: "All notifications have been marked as read.",
@@ -183,7 +245,7 @@ export default function AdminNotificationsPage() {
     const diffMins = Math.round(diffMs / 60000)
     const diffHours = Math.round(diffMs / 3600000)
     const diffDays = Math.round(diffMs / 86400000)
-    
+
     if (diffMins < 60) {
       return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
     } else if (diffHours < 24) {
@@ -199,6 +261,8 @@ export default function AdminNotificationsPage() {
         return <div className="bg-blue-100 p-2 rounded-full"><Users className="h-4 w-4 text-blue-600" /></div>
       case 'invoice_request':
         return <div className="bg-green-100 p-2 rounded-full"><FileText className="h-4 w-4 text-green-600" /></div>
+      case 'payment_processed':
+        return <div className="bg-emerald-100 p-2 rounded-full"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
       case 'alert':
         return <div className="bg-red-100 p-2 rounded-full"><AlertTriangle className="h-4 w-4 text-red-600" /></div>
       case 'system':
@@ -231,13 +295,13 @@ export default function AdminNotificationsPage() {
           )}
         </div>
       </div>
-      
+
       <div className="rounded-md border">
         {notifications.length > 0 ? (
           <div className="divide-y">
             {notifications.map((notification) => (
-              <div 
-                key={notification.id} 
+              <div
+                key={notification.id}
                 className={`p-4 flex items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'}`}
               >
                 {getNotificationIcon(notification.type)}
@@ -261,22 +325,32 @@ export default function AdminNotificationsPage() {
                 </div>
                 <div className="flex gap-2">
                   {!notification.read && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => markAsRead(notification.id)}
                       className="self-start"
                     >
                       Mark as read
                     </Button>
                   )}
-                  {notification.type === 'job_submission' && (
-                    <Button 
-                      variant="outline" 
+                  {(notification.type === 'job_submission' || notification.type === 'payment_processed') && (
+                    <Button
+                      variant="outline"
                       size="sm"
                       className="self-start"
                     >
                       View Details
+                    </Button>
+                  )}
+                  {notification.type === 'payment_processed' && notification.job?.paid && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="self-start bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-emerald-200"
+                    >
+                      <DollarSign className="mr-1 h-3 w-3" />
+                      Notify Subcontractor
                     </Button>
                   )}
                 </div>
@@ -306,7 +380,7 @@ function NotificationsLoadingSkeleton() {
         </div>
         <Skeleton className="h-10 w-[150px]" />
       </div>
-      
+
       <div className="rounded-md border">
         <div className="p-1">
           {Array(5).fill(null).map((_, i) => (
