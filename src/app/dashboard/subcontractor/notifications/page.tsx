@@ -5,7 +5,8 @@ import { createClientComponentClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Bell, DollarSign, FileText, AlertTriangle, Trash2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Bell, DollarSign, FileText, AlertTriangle, Trash2, CheckSquare } from "lucide-react"
 
 // Define notification types
 interface Notification {
@@ -28,6 +29,7 @@ export default function SubcontractorNotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [deletedMockIds, setDeletedMockIds] = useState<string[]>([])
+  const [selectedNotifications, setSelectedNotifications] = useState<string[]>([])
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
@@ -208,6 +210,132 @@ export default function SubcontractorNotificationsPage() {
     loadNotifications()
   }, [loadNotifications])
 
+  const toggleSelectNotification = (notificationId: string) => {
+    setSelectedNotifications(prev =>
+      prev.includes(notificationId)
+        ? prev.filter(id => id !== notificationId)
+        : [...prev, notificationId]
+    )
+  }
+
+  const selectAllNotifications = () => {
+    if (selectedNotifications.length === notifications.length) {
+      // If all are selected, deselect all
+      setSelectedNotifications([])
+    } else {
+      // Otherwise, select all
+      setSelectedNotifications(notifications.map(n => n.id))
+    }
+  }
+
+  const bulkDeleteNotifications = async () => {
+    if (selectedNotifications.length === 0) return
+
+    try {
+      console.log('Attempting to bulk delete notifications:', selectedNotifications)
+
+      // Update the state immediately for better UX (optimistic update)
+      setNotifications(notifications.map(notification =>
+        selectedNotifications.includes(notification.id)
+          ? { ...notification, deleted: true }
+          : notification
+      ))
+
+      // After a short delay, actually remove from the state
+      setTimeout(() => {
+        setNotifications(prevNotifications =>
+          prevNotifications.filter(notification => !selectedNotifications.includes(notification.id))
+        )
+      }, 650) // 650ms delay for animation to complete
+
+      // Separate real and mock notifications
+      const realNotificationIds = selectedNotifications.filter(id => id.includes('-'))
+      const mockNotificationIds = selectedNotifications.filter(id => !id.includes('-'))
+
+      // Handle mock notifications
+      if (mockNotificationIds.length > 0) {
+        console.log('Deleting mock notifications:', mockNotificationIds)
+
+        // Store the deleted mock notification IDs in local state
+        setDeletedMockIds(prev => {
+          const newDeletedIds = [...prev, ...mockNotificationIds];
+          console.log('Updated deletedMockIds state:', newDeletedIds);
+          return newDeletedIds;
+        })
+
+        // Also store in localStorage to persist across page refreshes
+        try {
+          // Get existing deleted IDs from localStorage
+          const storedIds = localStorage.getItem('deletedMockNotificationIds')
+          const deletedIds = storedIds ? JSON.parse(storedIds) : []
+          console.log('Current localStorage deletedIds:', deletedIds)
+
+          // Add the new IDs if they're not already in the list
+          const updatedIds = [...deletedIds]
+          mockNotificationIds.forEach(id => {
+            if (!updatedIds.includes(id)) {
+              updatedIds.push(id)
+            }
+          })
+          localStorage.setItem('deletedMockNotificationIds', JSON.stringify(updatedIds))
+          console.log('Updated localStorage with new deletedIds:', updatedIds)
+        } catch (storageError) {
+          console.error('Error storing deleted notification IDs in localStorage:', storageError)
+        }
+      }
+
+      // Handle real notifications
+      if (realNotificationIds.length > 0) {
+        console.log('Deleting real notifications via API:', realNotificationIds)
+
+        try {
+          const response = await fetch('/api/notifications/bulk-delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              notificationIds: realNotificationIds,
+            }),
+          })
+
+          const result = await response.json()
+          console.log('API response:', response.status, result)
+
+          if (!response.ok) {
+            throw new Error(result.message || 'Failed to delete notifications')
+          }
+        } catch (apiError) {
+          console.error('API request error:', apiError)
+          throw apiError
+        }
+      }
+
+      // Clear selected notifications after successful deletion
+      setSelectedNotifications([])
+
+      toast({
+        title: "Notifications deleted",
+        description: `${selectedNotifications.length} notification${selectedNotifications.length === 1 ? '' : 's'} deleted successfully.`,
+      })
+    } catch (error) {
+      console.error('Error deleting notifications:', error)
+
+      // Revert the state change if there was an error
+      setNotifications(notifications.map(notification =>
+        selectedNotifications.includes(notification.id)
+          ? { ...notification, deleted: false }
+          : notification
+      ))
+
+      toast({
+        variant: "destructive",
+        title: "Failed to delete notifications",
+        description: "There was a problem deleting the notifications. Please try again.",
+      })
+    }
+  }
+
   const deleteNotification = async (notificationId: string) => {
     try {
       console.log('Attempting to delete notification:', notificationId)
@@ -360,6 +488,30 @@ export default function SubcontractorNotificationsPage() {
             Stay updated with your latest activity
           </p>
         </div>
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-3">
+            {selectedNotifications.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={bulkDeleteNotifications}
+                className="h-9 px-3 flex items-center gap-1"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete Selected ({selectedNotifications.length})
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={selectAllNotifications}
+              className="h-9 px-3 flex items-center gap-1"
+            >
+              <CheckSquare className="h-4 w-4 mr-1" />
+              {selectedNotifications.length === notifications.length ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -368,9 +520,15 @@ export default function SubcontractorNotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 md:p-6 flex flex-col md:flex-row items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'} transition-all duration-500 ${notification.deleted ? 'opacity-0 scale-95 translate-x-2 h-0 p-0 overflow-hidden' : 'opacity-100 scale-100 translate-x-0'}`}
+                className={`p-4 md:p-6 flex flex-col md:flex-row items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'} transition-all duration-500 ${notification.deleted ? 'opacity-0 scale-95 translate-x-2 h-0 p-0 overflow-hidden' : 'opacity-100 scale-100 translate-x-0'} ${selectedNotifications.includes(notification.id) ? 'bg-muted/40 border-l-4 border-l-primary' : ''}`}
               >
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex items-center gap-3">
+                  <Checkbox
+                    id={`select-${notification.id}`}
+                    checked={selectedNotifications.includes(notification.id)}
+                    onCheckedChange={() => toggleSelectNotification(notification.id)}
+                    className="h-5 w-5 rounded-sm border-muted-foreground/30"
+                  />
                   {getNotificationIcon(notification.type)}
                 </div>
                 <div className="flex-1 min-w-0">
