@@ -211,7 +211,7 @@ export default function SubcontractorNotificationsPage() {
   const deleteNotification = async (notificationId: string) => {
     try {
       console.log('Attempting to delete notification:', notificationId)
-      
+
       // Update the state immediately for better UX (optimistic update)
       setNotifications(notifications.map(notification =>
         notification.id === notificationId
@@ -224,12 +224,12 @@ export default function SubcontractorNotificationsPage() {
         setNotifications(prevNotifications =>
           prevNotifications.filter(notification => notification.id !== notificationId)
         )
-      }, 500) // 500ms delay for animation to complete
+      }, 650) // 650ms delay for animation to complete
 
       // For mock notifications (those without hyphens), track them as deleted
       if (!notificationId.includes('-')) {
         console.log('Deleting mock notification:', notificationId)
-        
+
         // Store the deleted mock notification ID in local state
         setDeletedMockIds(prev => {
           const newDeletedIds = [...prev, notificationId];
@@ -256,7 +256,7 @@ export default function SubcontractorNotificationsPage() {
       } else {
         // For real notifications (with hyphens), delete from the database
         console.log('Deleting real notification via API:', notificationId)
-        
+
         try {
           const response = await fetch('/api/notifications/delete', {
             method: 'POST',
@@ -334,15 +334,15 @@ export default function SubcontractorNotificationsPage() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'job_update':
-        return <div className="bg-blue-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><Bell className="h-4 w-4 text-blue-600" /></div>
+        return <div className="bg-blue-100 p-3 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm"><Bell className="h-5 w-5 text-blue-600" /></div>
       case 'invoice_status':
-        return <div className="bg-green-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><FileText className="h-4 w-4 text-green-600" /></div>
+        return <div className="bg-green-100 p-3 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm"><FileText className="h-5 w-5 text-green-600" /></div>
       case 'payment_processed':
-        return <div className="bg-emerald-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
+        return <div className="bg-emerald-100 p-3 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm"><DollarSign className="h-5 w-5 text-emerald-600" /></div>
       case 'system':
-        return <div className="bg-amber-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><Bell className="h-4 w-4 text-amber-600" /></div>
+        return <div className="bg-amber-100 p-3 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm"><AlertTriangle className="h-5 w-5 text-amber-600" /></div>
       default:
-        return <div className="bg-gray-100 p-2 md:p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center"><Bell className="h-4 w-4 text-gray-600" /></div>
+        return <div className="bg-gray-100 p-3 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm"><Bell className="h-5 w-5 text-gray-600" /></div>
     }
   }
 
@@ -353,10 +353,10 @@ export default function SubcontractorNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Notifications</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Notifications</h2>
+          <p className="text-muted-foreground mt-1">
             Stay updated with your latest activity
           </p>
         </div>
@@ -368,24 +368,26 @@ export default function SubcontractorNotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 md:p-4 flex flex-col md:flex-row items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'} transition-all duration-300 opacity-100 animate-fadeIn`}
+                className={`p-4 md:p-6 flex flex-col md:flex-row items-start gap-4 ${notification.read ? 'bg-background' : 'bg-muted/30'} transition-all duration-500 ${notification.deleted ? 'opacity-0 scale-95 translate-x-2 h-0 p-0 overflow-hidden' : 'opacity-100 scale-100 translate-x-0'}`}
               >
-                {getNotificationIcon(notification.type)}
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <h4 className={`text-sm font-medium ${notification.read ? '' : 'font-semibold'}`}>
+                <div className="flex-shrink-0">
+                  {getNotificationIcon(notification.type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
+                    <h4 className={`text-sm font-medium ${notification.read ? '' : 'font-semibold'} break-words`}>
                       {notification.title}
                       {notification.job && (
-                        <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded">
+                        <span className="ml-2 text-xs bg-muted px-2 py-1 rounded-full inline-flex items-center min-h-[22px]">
                           {notification.job.job_type}
                         </span>
                       )}
                     </h4>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDate(notification.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground mt-2 break-words">
                     {notification.type === 'payment_processed' || notification.type === 'invoice_status' ? (
                       <span dangerouslySetInnerHTML={{ __html: highlightPaidText(notification.message) }} />
                     ) : (
@@ -394,20 +396,20 @@ export default function SubcontractorNotificationsPage() {
                   </p>
                   {notification.type === 'payment_processed' && notification.job?.paid && (
                     <div className="mt-2 flex items-center">
-                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full flex items-center">
+                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full flex items-center min-h-[24px]">
                         <DollarSign className="h-3 w-3 mr-1" />
                         Payment Processed
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col gap-2 min-w-[100px] w-full md:w-auto mt-3 md:mt-0 border-t md:border-t-0 pt-3 md:pt-0">
-                  <div className="flex gap-2 flex-wrap">
+                <div className="flex flex-col gap-2 min-w-[100px] w-full md:w-auto mt-4 md:mt-0 border-t md:border-t-0 pt-3 md:pt-0">
+                  <div className="flex gap-3 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => deleteNotification(notification.id)}
-                      className="h-10 px-4 min-w-[44px] transition-colors hover:bg-destructive/10 touch-manipulation"
+                      className="h-11 px-4 min-w-[44px] min-h-[44px] transition-colors hover:bg-destructive/10 touch-manipulation flex items-center justify-center"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
@@ -417,7 +419,7 @@ export default function SubcontractorNotificationsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 px-4 min-w-[44px] touch-manipulation"
+                        className="h-11 px-4 min-w-[44px] min-h-[44px] touch-manipulation flex items-center justify-center"
                         asChild
                       >
                         <a href={`/dashboard/subcontractor/jobs/${notification.job.id}`}>
@@ -432,7 +434,13 @@ export default function SubcontractorNotificationsPage() {
           </div>
         ) : (
           <div className="p-8 text-center">
-            <p className="text-muted-foreground mb-4">You don&apos;t have any notifications yet.</p>
+            <div className="flex justify-center mb-4">
+              <div className="bg-muted/30 p-3 rounded-full h-16 w-16 flex items-center justify-center">
+                <Bell className="h-8 w-8 text-muted-foreground/60" />
+              </div>
+            </div>
+            <h3 className="text-lg font-medium mb-2">No notifications</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">You don&apos;t have any notifications yet. When you receive notifications, they will appear here.</p>
           </div>
         )}
       </div>
@@ -444,32 +452,34 @@ export default function SubcontractorNotificationsPage() {
 function NotificationsLoadingSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Notifications</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Notifications</h2>
+          <p className="text-muted-foreground mt-1">
             Stay updated with your latest activity
           </p>
         </div>
       </div>
 
       <div className="rounded-md border">
-        <div className="p-1">
+        <div className="divide-y">
           {Array(5).fill(null).map((_, i) => (
-            <div key={i} className="flex flex-col md:flex-row items-start gap-4 p-4 border-t first:border-t-0">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2 w-full">
-                <div className="flex justify-between items-start">
-                  <Skeleton className="h-5 w-1/3" />
-                  <Skeleton className="h-4 w-[60px]" />
+            <div key={i} className="flex flex-col md:flex-row items-start gap-4 p-4 md:p-6">
+              <div className="flex-shrink-0">
+                <Skeleton className="h-[44px] w-[44px] rounded-full" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-3 w-full">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                  <Skeleton className="h-5 w-[180px]" />
+                  <Skeleton className="h-4 w-[80px]" />
                 </div>
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
               </div>
-              <div className="flex flex-col gap-2 min-w-[100px] w-full md:w-auto mt-3 md:mt-0 border-t md:border-t-0 pt-3 md:pt-0">
-                <div className="flex gap-2">
-                  <Skeleton className="h-10 w-[100px]" />
-                  <Skeleton className="h-10 w-[100px]" />
+              <div className="flex flex-col gap-2 min-w-[100px] w-full md:w-auto mt-4 md:mt-0 border-t md:border-t-0 pt-3 md:pt-0">
+                <div className="flex gap-3 flex-wrap">
+                  <Skeleton className="h-11 w-[100px] rounded-md" />
+                  <Skeleton className="h-11 w-[100px] rounded-md" />
                 </div>
               </div>
             </div>
