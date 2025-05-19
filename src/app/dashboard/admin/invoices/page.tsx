@@ -31,8 +31,8 @@ import {
   MoreHorizontal,
   Search,
   CheckCircle,
-  Send, // For 'sent' status
-  FileText, // For 'generated' status
+  AlertCircle, // For 'overdue' status
+  FileText, // For 'unpaid' status
   Download,
 } from "lucide-react"
 import {
@@ -62,7 +62,7 @@ interface InvoiceRecord {
   issued_date: string;
   due_date: string;
   amount: number;
-  status: string;
+  status: string; // 'unpaid', 'paid', 'overdue'
   created_at: string | null;
   updated_at: string | null;
 }
@@ -74,6 +74,7 @@ interface InvoiceWithDetails extends InvoiceRecord {
     job_type: string | null;
     location: string | null;
     line_items: Json[] | null;
+    status: string; // 'pending', 'in-progress', 'completed'
     profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
   } | null;
 }
@@ -123,7 +124,7 @@ export default function AdminInvoicesPage() {
     try {
       setLoading(true);
 
-      // Build the base query
+      // Build the base query - only show invoices for completed jobs
       let query = supabase
         .from('invoices')
         .select(`
@@ -133,10 +134,13 @@ export default function AdminInvoicesPage() {
             job_type,
             location,
             line_items,
+            status,
             profiles:subcontractor_id ( id, company_name )
           )
         `, { count: 'exact' })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        // Filter to only show invoices for completed jobs
+        .eq('jobs.status', 'completed');
 
       // Apply status filter if selected
       if (statusFilter !== "all") {
@@ -317,9 +321,9 @@ export default function AdminInvoicesPage() {
     switch (status) {
       case 'paid':
         return { icon: CheckCircle, color: 'text-green-800', bg: 'bg-green-100' };
-      case 'sent':
-        return { icon: Send, color: 'text-blue-800', bg: 'bg-blue-100' };
-      case 'generated':
+      case 'overdue':
+        return { icon: AlertCircle, color: 'text-red-800', bg: 'bg-red-100' };
+      case 'unpaid':
       default:
         return { icon: FileText, color: 'text-amber-800', bg: 'bg-amber-100' };
     }
@@ -329,9 +333,9 @@ export default function AdminInvoicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Manage Invoices</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Completed Job Invoices</h2>
         <p className="text-muted-foreground">
-          View and manage all subcontractor invoices
+          View and manage invoices for completed subcontractor jobs
         </p>
       </div>
 
@@ -361,9 +365,9 @@ export default function AdminInvoicesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="generated">Generated</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -399,52 +403,64 @@ export default function AdminInvoicesPage() {
                 {invoices.map((invoice) => {
                   const statusStyle = getStatusStyle(invoice.status);
                   return (
-                    <div key={invoice.id} className="rounded-lg border p-4 space-y-3">
+                    <div key={invoice.id} className="rounded-lg border shadow-sm p-4 space-y-3 bg-white">
                       <div className="flex justify-between items-start">
-                        <h3 className="font-medium">{formatDate(invoice.created_at)}</h3>
+                        <div>
+                          <h3 className="font-medium text-base">{formatDate(invoice.created_at)}</h3>
+                          <p className="text-xs text-muted-foreground">Invoice #{invoice.invoice_number}</p>
+                        </div>
                         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                           <statusStyle.icon className="mr-1 h-3 w-3" />
                           {invoice.status || 'N/A'}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <p className="text-muted-foreground">Subcontractor</p>
-                          <p className="truncate">{invoice.jobs?.profiles?.company_name || 'N/A'}</p>
+                          <p className="text-muted-foreground text-xs">Subcontractor</p>
+                          <p className="truncate font-medium">{invoice.jobs?.profiles?.company_name || 'N/A'}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Job Type</p>
-                          <p className="truncate">{invoice.jobs?.job_type || 'N/A'}</p>
+                          <p className="text-muted-foreground text-xs">Job Type</p>
+                          <p className="truncate font-medium">{invoice.jobs?.job_type || 'N/A'}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Amount</p>
-                          <p className="font-medium">{formatCurrency(invoice.amount)}</p>
+                          <p className="text-muted-foreground text-xs">Amount</p>
+                          <p className="font-medium text-base">{formatCurrency(invoice.amount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Due Date</p>
+                          <p className="font-medium">{formatDate(invoice.due_date)}</p>
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
-                          Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsGeneratingPDF(invoice.job_id);
-                            window.open(`/api/admin/invoices/${invoice.job_id}`, '_blank');
-                            setTimeout(() => setIsGeneratingPDF(null), 1000);
-                          }}
-                          disabled={isGeneratingPDF === invoice.job_id}
-                        >
-                          {isGeneratingPDF === invoice.job_id ? (
-                            <PDFButtonLoading />
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4 mr-1" /> PDF
-                            </>
-                          )}
-                        </Button>
+                      <div className="flex justify-between items-center pt-2 border-t mt-2">
+                        <div className="text-xs text-muted-foreground">
+                          Job Status: <span className="font-medium">{invoice.jobs?.status}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
+                            Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsGeneratingPDF(invoice.job_id);
+                              window.open(`/api/admin/invoices/${invoice.job_id}`, '_blank');
+                              setTimeout(() => setIsGeneratingPDF(null), 1000);
+                            }}
+                            disabled={isGeneratingPDF === invoice.job_id}
+                          >
+                            {isGeneratingPDF === invoice.job_id ? (
+                              <PDFButtonLoading />
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4 mr-1" /> PDF
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -457,9 +473,11 @@ export default function AdminInvoicesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Subcontractor</TableHead>
-                    <TableHead>Job Type/Desc</TableHead>
+                    <TableHead>Job Type</TableHead>
+                    <TableHead>Due Date</TableHead>
                     <TableHead className="text-right">Amount (RM)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -469,12 +487,20 @@ export default function AdminInvoicesPage() {
                   {invoices.map((invoice) => {
                     const statusStyle = getStatusStyle(invoice.status);
                     return (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">{formatDate(invoice.created_at)}</TableCell>
+                      <TableRow key={invoice.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                        <TableCell>{formatDate(invoice.created_at)}</TableCell>
                         <TableCell>{invoice.jobs?.profiles?.company_name || 'N/A'}</TableCell>
-                        {/* Display job_type or fallback */}
-                        <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(invoice.amount)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span>{invoice.jobs?.job_type || 'N/A'}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Job Status: {invoice.jobs?.status}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(invoice.amount)}</TableCell>
                         <TableCell>
                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                             <statusStyle.icon className="mr-1 h-3 w-3" />
@@ -497,18 +523,18 @@ export default function AdminInvoicesPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel>Change Status</DropdownMenuLabel>
                               <DropdownMenuItem
-                                disabled={invoice.status === 'generated'}
-                                onClick={() => updateInvoiceStatus(invoice.id, 'generated')}
+                                disabled={invoice.status === 'unpaid'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'unpaid')}
                               >
                                 <FileText className="mr-2 h-4 w-4 text-amber-500" />
-                                Mark as Generated
+                                Mark as Unpaid
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                disabled={invoice.status === 'sent'}
-                                onClick={() => updateInvoiceStatus(invoice.id, 'sent')}
+                                disabled={invoice.status === 'overdue'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'overdue')}
                               >
-                                <Send className="mr-2 h-4 w-4 text-blue-500" />
-                                Mark as Sent
+                                <AlertCircle className="mr-2 h-4 w-4 text-red-500" />
+                                Mark as Overdue
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={invoice.status === 'paid'}
@@ -610,63 +636,92 @@ export default function AdminInvoicesPage() {
       {/* Invoice details dialog */}
       {selectedInvoice && (
         <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-[525px]">
+          <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Invoice Details</DialogTitle>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Invoice #{selectedInvoice.invoice_number}</span>
+                <div className="inline-flex items-center">
+                  {(() => {
+                    const statusStyle = getStatusStyle(selectedInvoice.status);
+                    return (
+                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusStyle.bg} ${statusStyle.color}`}>
+                        <statusStyle.icon className="mr-2 h-4 w-4" />
+                        {selectedInvoice.status || 'N/A'}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </DialogTitle>
               <DialogDescription>
-                Detailed information for invoice generated on {formatDate(selectedInvoice.created_at)}.
+                Invoice created on {formatDate(selectedInvoice.created_at)} for completed job
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Invoice ID:</div>
-                <div className="col-span-2 sm:col-span-3 text-xs text-muted-foreground break-all">{selectedInvoice.id}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job ID:</div>
-                <div className="col-span-2 sm:col-span-3 text-xs text-muted-foreground break-all">{selectedInvoice.job_id}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedInvoice.jobs?.profiles?.company_name || 'N/A'}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job Desc:</div>
-                {/* Display job_type or fallback */}
-                <div className="col-span-2 sm:col-span-3">{selectedInvoice.jobs?.job_type || 'N/A'}</div>
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job Location:</div>
-                <div className="col-span-3">{selectedInvoice.jobs?.location || 'N/A'}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Invoice Date:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.created_at)}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Amount:</div>
-                <div className="col-span-3 font-bold">{formatCurrency(selectedInvoice.amount)}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Status:</div>
-                <div className="col-span-3">
-                   {(() => {
-                       const statusStyle = getStatusStyle(selectedInvoice.status);
-                       return (
-                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
-                             <statusStyle.icon className="mr-1 h-3 w-3" />
-                             {selectedInvoice.status || 'N/A'}
-                           </div>
-                       );
-                   })()}
+
+            <div className="grid gap-6 py-4">
+              {/* Invoice Information Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Invoice Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Invoice Number</p>
+                    <p className="font-medium">{selectedInvoice.invoice_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Invoice Date</p>
+                    <p className="font-medium">{formatDate(selectedInvoice.issued_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Due Date</p>
+                    <p className="font-medium">{formatDate(selectedInvoice.due_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Amount</p>
+                    <p className="font-medium text-lg">{formatCurrency(selectedInvoice.amount)}</p>
+                  </div>
                 </div>
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Created At:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.created_at)}</div>
-              </div>               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Last Updated:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.updated_at)}</div>
+
+              {/* Job Information Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Job Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Job Type</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.job_type || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Job Status</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.status || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.location || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Subcontractor</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.profiles?.company_name || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* System Information Section */}
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Invoice ID:</span>
+                  <span className="font-mono">{selectedInvoice.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Job ID:</span>
+                  <span className="font-mono">{selectedInvoice.job_id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Created:</span>
+                  <span>{formatDate(selectedInvoice.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Last Updated:</span>
+                  <span>{formatDate(selectedInvoice.updated_at)}</span>
+                </div>
               </div>
 
               {/* Line Items Section */}
@@ -711,24 +766,60 @@ export default function AdminInvoicesPage() {
                 )}
               </div>
             </div>
-            <DialogFooter>
-               <Button variant="outline" onClick={() => setSelectedInvoice(null)}>Close</Button>
-               <Button
-                 onClick={() => {
-                   setIsGeneratingPDF(selectedInvoice.job_id);
-                   window.open(`/api/admin/invoices/${selectedInvoice.job_id}`, '_blank');
-                   setTimeout(() => setIsGeneratingPDF(null), 1000);
-                 }}
-                 disabled={isGeneratingPDF === selectedInvoice.job_id}
-               >
-                 {isGeneratingPDF === selectedInvoice.job_id ? (
-                   <PDFButtonLoading />
-                 ) : (
-                   <>
-                     <Download className="mr-2 h-4 w-4" /> Download PDF
-                   </>
-                 )}
-               </Button>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => updateInvoiceStatus(selectedInvoice.id, 'unpaid')}
+                  disabled={selectedInvoice.status === 'unpaid'}
+                >
+                  <FileText className="mr-2 h-4 w-4 text-amber-500" />
+                  Mark Unpaid
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => updateInvoiceStatus(selectedInvoice.id, 'overdue')}
+                  disabled={selectedInvoice.status === 'overdue'}
+                >
+                  <AlertCircle className="mr-2 h-4 w-4 text-red-500" />
+                  Mark Overdue
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => updateInvoiceStatus(selectedInvoice.id, 'paid')}
+                  disabled={selectedInvoice.status === 'paid'}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                  Mark Paid
+                </Button>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
+                <Button variant="outline" onClick={() => setSelectedInvoice(null)}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsGeneratingPDF(selectedInvoice.job_id);
+                    window.open(`/api/admin/invoices/${selectedInvoice.job_id}`, '_blank');
+                    setTimeout(() => setIsGeneratingPDF(null), 1000);
+                  }}
+                  disabled={isGeneratingPDF === selectedInvoice.job_id}
+                >
+                  {isGeneratingPDF === selectedInvoice.job_id ? (
+                    <PDFButtonLoading />
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" /> Download PDF
+                    </>
+                  )}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
