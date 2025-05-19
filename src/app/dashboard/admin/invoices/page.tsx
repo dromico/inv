@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Correct import for client components
 import { Database, Json } from "@/types/database"
 import { useToast } from "@/hooks/use-toast"
@@ -52,21 +51,31 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Define types based on the actual query structure
-type InvoiceRecord = Database['public']['Tables']['invoices']['Row']
-type JobRecord = Database['public']['Tables']['jobs']['Row']
+// Define types based on the actual database schema
 type ProfileRecord = Database['public']['Tables']['profiles']['Row']
 
+// Custom interface for the invoice data from the database
+interface InvoiceRecord {
+  id: string;
+  job_id: string;
+  invoice_number: string;
+  issued_date: string;
+  due_date: string;
+  amount: number;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 // Simplified and corrected type for the joined data
-// Assuming 'jobs' might not have 'description' directly, let's use 'job_type' or fallback
 interface InvoiceWithDetails extends InvoiceRecord {
   jobs: {
     id: string;
     job_type: string | null;
     location: string | null;
     line_items: Json[] | null;
-  } | null; // Include line_items with proper Json type
-  profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
+    profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
+  } | null;
 }
 
 // Type for subcontractors list
@@ -119,10 +128,15 @@ export default function AdminInvoicesPage() {
         .from('invoices')
         .select(`
           *,
-          jobs ( id, job_type, location, line_items ),
-          profiles:subcontractor_id ( id, company_name )
+          jobs (
+            id,
+            job_type,
+            location,
+            line_items,
+            profiles:subcontractor_id ( id, company_name )
+          )
         `, { count: 'exact' })
-        .order('invoice_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
       // Apply status filter if selected
       if (statusFilter !== "all") {
@@ -131,14 +145,12 @@ export default function AdminInvoicesPage() {
 
       // Apply subcontractor filter if selected
       if (subcontractorFilter !== "all") {
-        query = query.eq('subcontractor_id', subcontractorFilter);
+        // We need to filter on the jobs.subcontractor_id field
+        query = query.eq('jobs.subcontractor_id', subcontractorFilter);
       }
 
       // Apply search filter if provided
       if (searchQuery) {
-        // Create search pattern with wildcards
-        const searchPattern = `%${searchQuery}%`;
-
         // Use separate filters for each condition
         // Note: We can't directly filter on foreign tables in the OR clause
         // So we'll use a simpler approach for now
@@ -173,8 +185,8 @@ export default function AdminInvoicesPage() {
               : false;
 
             // Check company_name (with null/undefined handling)
-            const companyMatch = invoice.profiles?.company_name
-              ? invoice.profiles.company_name.toLowerCase().includes(searchLower)
+            const companyMatch = invoice.jobs?.profiles?.company_name
+              ? invoice.jobs.profiles.company_name.toLowerCase().includes(searchLower)
               : false;
 
             // Return true if either matches
@@ -182,8 +194,8 @@ export default function AdminInvoicesPage() {
           });
         }
 
-        // Ensure data matches the expected type
-        setInvoices(filteredData as InvoiceWithDetails[]);
+        // Convert the data to match our expected type
+        setInvoices(filteredData as unknown as InvoiceWithDetails[]);
 
         // If we're doing client-side filtering, we need to adjust the total count
         if (searchQuery) {
@@ -389,7 +401,7 @@ export default function AdminInvoicesPage() {
                   return (
                     <div key={invoice.id} className="rounded-lg border p-4 space-y-3">
                       <div className="flex justify-between items-start">
-                        <h3 className="font-medium">{formatDate(invoice.invoice_date)}</h3>
+                        <h3 className="font-medium">{formatDate(invoice.created_at)}</h3>
                         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                           <statusStyle.icon className="mr-1 h-3 w-3" />
                           {invoice.status || 'N/A'}
@@ -399,7 +411,7 @@ export default function AdminInvoicesPage() {
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <p className="text-muted-foreground">Subcontractor</p>
-                          <p className="truncate">{invoice.profiles?.company_name || 'N/A'}</p>
+                          <p className="truncate">{invoice.jobs?.profiles?.company_name || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Job Type</p>
@@ -407,7 +419,7 @@ export default function AdminInvoicesPage() {
                         </div>
                         <div>
                           <p className="text-muted-foreground">Amount</p>
-                          <p className="font-medium">{formatCurrency(invoice.total_amount)}</p>
+                          <p className="font-medium">{formatCurrency(invoice.amount)}</p>
                         </div>
                       </div>
 
@@ -458,11 +470,11 @@ export default function AdminInvoicesPage() {
                     const statusStyle = getStatusStyle(invoice.status);
                     return (
                       <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">{formatDate(invoice.invoice_date)}</TableCell>
-                        <TableCell>{invoice.profiles?.company_name || 'N/A'}</TableCell>
+                        <TableCell className="font-medium">{formatDate(invoice.created_at)}</TableCell>
+                        <TableCell>{invoice.jobs?.profiles?.company_name || 'N/A'}</TableCell>
                         {/* Display job_type or fallback */}
                         <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.amount)}</TableCell>
                         <TableCell>
                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                             <statusStyle.icon className="mr-1 h-3 w-3" />
@@ -602,7 +614,7 @@ export default function AdminInvoicesPage() {
             <DialogHeader>
               <DialogTitle>Invoice Details</DialogTitle>
               <DialogDescription>
-                Detailed information for invoice generated on {formatDate(selectedInvoice.invoice_date)}.
+                Detailed information for invoice generated on {formatDate(selectedInvoice.created_at)}.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -616,7 +628,7 @@ export default function AdminInvoicesPage() {
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedInvoice.profiles?.company_name || 'N/A'}</div>
+                <div className="col-span-2 sm:col-span-3">{selectedInvoice.jobs?.profiles?.company_name || 'N/A'}</div>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
                 <div className="font-medium">Job Desc:</div>
@@ -629,11 +641,11 @@ export default function AdminInvoicesPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Invoice Date:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.invoice_date)}</div>
+                <div className="col-span-3">{formatDate(selectedInvoice.created_at)}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Amount:</div>
-                <div className="col-span-3 font-bold">{formatCurrency(selectedInvoice.total_amount)}</div>
+                <div className="col-span-3 font-bold">{formatCurrency(selectedInvoice.amount)}</div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <div className="font-medium">Status:</div>
