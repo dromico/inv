@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Correct import for client components
 import { Database, Json } from "@/types/database"
 import { useToast } from "@/hooks/use-toast"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PDFButtonLoading } from "@/components/pdf-loading"
@@ -34,6 +35,7 @@ import {
   AlertCircle, // For 'overdue' status
   FileText, // For 'unpaid' status
   Download,
+  RefreshCw, // For refresh button
 } from "lucide-react"
 import {
   Select,
@@ -67,16 +69,24 @@ interface InvoiceRecord {
   updated_at: string | null;
 }
 
+// Comprehensive type for the joined job data
+interface JobDetails {
+  id: string;
+  job_type: string | null;
+  location: string | null;
+  line_items: Json[] | null;
+  status: string; // 'pending', 'in-progress', 'completed'
+  total: number | null;
+  paid: boolean | null;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
+  profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
+}
+
 // Simplified and corrected type for the joined data
 interface InvoiceWithDetails extends InvoiceRecord {
-  jobs: {
-    id: string;
-    job_type: string | null;
-    location: string | null;
-    line_items: Json[] | null;
-    status: string; // 'pending', 'in-progress', 'completed'
-    profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
-  } | null;
+  jobs: JobDetails | null;
 }
 
 // Type for subcontractors list
@@ -86,13 +96,15 @@ export default function AdminInvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all") // 'generated', 'sent', 'paid'
+  const [statusFilter, setStatusFilter] = useState<string>("all") // 'unpaid', 'paid', 'overdue'
   const [subcontractorFilter, setSubcontractorFilter] = useState<string>("all")
   const [subcontractors, setSubcontractors] = useState<SubcontractorInfo[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalInvoices, setTotalInvoices] = useState(0)
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithDetails | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null)
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const invoicesPerPage = 10
 
   const { toast } = useToast()
@@ -125,6 +137,7 @@ export default function AdminInvoicesPage() {
       setLoading(true);
 
       // Build the base query - only show invoices for completed jobs
+      // Use a more comprehensive select to ensure we have all the job data we need
       let query = supabase
         .from('invoices')
         .select(`
@@ -135,6 +148,11 @@ export default function AdminInvoicesPage() {
             location,
             line_items,
             status,
+            total,
+            paid,
+            start_date,
+            end_date,
+            notes,
             profiles:subcontractor_id ( id, company_name )
           )
         `, { count: 'exact' })
@@ -226,6 +244,38 @@ export default function AdminInvoicesPage() {
   }, [supabase, toast, currentPage, statusFilter, subcontractorFilter, searchQuery, invoicesPerPage]);
 
 
+  // Function to manually refresh data
+  const refreshData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadInvoices();
+      setLastRefreshed(new Date());
+      toast({
+        title: "Data refreshed",
+        description: "Invoice data has been updated with the latest job information.",
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast({
+        variant: "destructive",
+        title: "Refresh failed",
+        description: "There was a problem refreshing the data. Please try again.",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadInvoices, toast]);
+
+  // Auto-refresh data every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadInvoices();
+      setLastRefreshed(new Date());
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+
+    return () => clearInterval(interval);
+  }, [loadInvoices]);
+
   useEffect(() => {
     loadInvoices();
     loadSubcontractors();
@@ -258,6 +308,56 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  // Function to update invoice amount to match job total
+  const syncInvoiceAmount = async (invoice: InvoiceWithDetails) => {
+    try {
+      const jobTotal = calculateTotalAmount(invoice.jobs);
+
+      // Only update if the amounts are different
+      if (invoice.amount === jobTotal) {
+        toast({
+          title: "No update needed",
+          description: "Invoice amount already matches job total.",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          amount: jobTotal,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoice.id);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Amount synchronized",
+        description: `Invoice amount updated to match job total: ${formatCurrency(jobTotal)}`,
+      });
+
+      // If we have a selected invoice, update it in the state
+      if (selectedInvoice && selectedInvoice.id === invoice.id) {
+        setSelectedInvoice({
+          ...selectedInvoice,
+          amount: jobTotal
+        });
+      }
+
+      loadInvoices(); // Reload invoices to reflect the change
+    } catch (error) {
+      console.error('Error updating invoice amount:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to update amount",
+        description: "There was a problem updating the invoice amount. Please try again.",
+      });
+    }
+  };
+
   const totalPages = Math.ceil(totalInvoices / invoicesPerPage);
 
   const handlePageChange = (page: number) => {
@@ -280,6 +380,16 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  const formatTime = (date: Date) => {
+    try {
+      // Use date-fns format with explicit 12-hour time with uppercase AM/PM
+      return format(date, 'h:mm:ss a');
+    } catch (e) {
+      console.error("Error formatting time:", date, e);
+      return 'Invalid Time';
+    }
+  };
+
   const formatCurrency = (amount: number | null) => {
     if (amount === null || amount === undefined) return 'N/A';
     return new Intl.NumberFormat('en-MY', {
@@ -287,6 +397,37 @@ export default function AdminInvoicesPage() {
       currency: 'MYR',
       minimumFractionDigits: 2
     }).format(amount);
+  };
+
+  // Calculate the total amount from job data - ensures consistency with jobs page
+  const calculateTotalAmount = (job: JobDetails | null): number => {
+    if (!job) return 0;
+
+    // Start with the base job amount
+    let total = job.total || 0;
+
+    // If there are line items, add their totals
+    if (job.line_items && Array.isArray(job.line_items)) {
+      try {
+        // Calculate total from all line items
+        const lineItemsTotal = job.line_items.reduce((sum: number, item: any) => {
+          if (!item) return sum;
+
+          const quantity = Number(item.unit_quantity || item.quantity || 0);
+          const price = Number(item.unit_price || 0);
+          return sum + (quantity * price);
+        }, 0);
+
+        // If we have line items, use their total instead of the base total
+        if (job.line_items.length > 0) {
+          return lineItemsTotal;
+        }
+      } catch (error) {
+        console.error('Error calculating total from line items:', error);
+      }
+    }
+
+    return total;
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -388,6 +529,24 @@ export default function AdminInvoicesPage() {
             </SelectContent>
           </Select>
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={refreshData}
+          disabled={isRefreshing}
+          title="Refresh data from jobs"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="sr-only">Refresh</span>
+        </Button>
+      </div>
+
+      {/* Last refreshed indicator */}
+      <div className="text-xs text-muted-foreground">
+        Last refreshed: {formatTime(lastRefreshed)} •
+        <span className="ml-1 italic">
+          Data is automatically synchronized with the jobs page every 5 minutes
+        </span>
       </div>
 
       <div className="rounded-md border">
@@ -426,7 +585,12 @@ export default function AdminInvoicesPage() {
                         </div>
                         <div>
                           <p className="text-muted-foreground text-xs">Amount</p>
-                          <p className="font-medium text-base">{formatCurrency(invoice.amount)}</p>
+                          <p className="font-medium text-base">{formatCurrency(calculateTotalAmount(invoice.jobs))}</p>
+                          {invoice.amount !== calculateTotalAmount(invoice.jobs) && (
+                            <p className="text-xs text-amber-600">
+                              *Updated from job data
+                            </p>
+                          )}
                         </div>
                         <div>
                           <p className="text-muted-foreground text-xs">Due Date</p>
@@ -500,7 +664,12 @@ export default function AdminInvoicesPage() {
                           </div>
                         </TableCell>
                         <TableCell>{formatDate(invoice.due_date)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(invoice.amount)}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(calculateTotalAmount(invoice.jobs))}
+                          {invoice.amount !== calculateTotalAmount(invoice.jobs) && (
+                            <p className="text-xs text-amber-600">*Updated</p>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                             <statusStyle.icon className="mr-1 h-3 w-3" />
@@ -544,6 +713,14 @@ export default function AdminInvoicesPage() {
                                 Mark as Paid
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              {invoice.amount !== calculateTotalAmount(invoice.jobs) && (
+                                <DropdownMenuItem
+                                  onClick={() => syncInvoiceAmount(invoice)}
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4 text-blue-500" />
+                                  Sync Amount with Job
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => {
                                   setIsGeneratingPDF(invoice.job_id);
@@ -676,7 +853,12 @@ export default function AdminInvoicesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Amount</p>
-                    <p className="font-medium text-lg">{formatCurrency(selectedInvoice.amount)}</p>
+                    <p className="font-medium text-lg">{formatCurrency(calculateTotalAmount(selectedInvoice.jobs))}</p>
+                    {selectedInvoice.amount !== calculateTotalAmount(selectedInvoice.jobs) && (
+                      <p className="text-xs text-amber-600">
+                        *Updated from job data (original: {formatCurrency(selectedInvoice.amount)})
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -800,6 +982,14 @@ export default function AdminInvoicesPage() {
                 </Button>
               </div>
               <div className="flex gap-2 w-full sm:w-auto justify-end">
+                {selectedInvoice.amount !== calculateTotalAmount(selectedInvoice.jobs) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => syncInvoiceAmount(selectedInvoice)}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" /> Sync Amount
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setSelectedInvoice(null)}>
                   Close
                 </Button>
