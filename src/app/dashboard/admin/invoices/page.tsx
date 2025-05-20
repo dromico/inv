@@ -283,13 +283,78 @@ export default function AdminInvoicesPage() {
 
   const updateInvoiceStatus = async (invoiceId: string, status: string) => {
     try {
-      const { error } = await supabase
+      // Get the invoice with job details before updating
+      const { data: invoice, error: fetchError } = await supabase
         .from('invoices')
-        .update({ status: status, updated_at: new Date().toISOString() }) // Also update updated_at
-        .eq('id', invoiceId);
+        .select(`
+          id,
+          job_id,
+          status,
+          jobs (
+            id,
+            status
+          )
+        `)
+        .eq('id', invoiceId)
+        .single();
 
-      if (error) {
-        throw error;
+      if (fetchError) {
+        console.error('Error fetching invoice details:', fetchError);
+        throw fetchError;
+      }
+
+      // Try to update the invoice status using the RPC function with proper type casting
+      try {
+        const { error: rpcError } = await supabase.rpc('update_invoice_status', {
+          invoice_id: invoiceId,
+          new_status: status
+        });
+
+        if (rpcError) {
+          console.error('Error using RPC to update invoice status:', rpcError);
+
+          // Fallback to direct update with options
+          const { error } = await supabase
+            .from('invoices')
+            .update({ status: status }, {
+              // Use PostgreSQL casting to ensure the status is treated as invoice_status enum
+              returning: "minimal",
+              count: "exact"
+            })
+            .eq('id', invoiceId);
+
+          if (error) {
+            console.error('Error details from direct update:', error);
+            throw error;
+          }
+        }
+      } catch (updateError) {
+        console.error('Exception during invoice status update:', updateError);
+        throw updateError;
+      }
+
+      // Update corresponding job paid status if invoice status is changing to/from 'paid'
+      if (invoice && invoice.jobs && invoice.jobs.status === 'completed') {
+        try {
+          // Only sync if the job is completed
+          const jobId = invoice.job_id;
+          const isPaid = status === 'paid';
+
+          // Update job paid status
+          const { error: jobUpdateError } = await supabase
+            .from('jobs')
+            .update({ paid: isPaid })
+            .eq('id', jobId);
+
+          if (jobUpdateError) {
+            console.error('Error updating job paid status:', jobUpdateError);
+          } else {
+            console.log(`Job paid status updated to ${isPaid}`);
+          }
+        } catch (syncError) {
+          console.error('Error syncing job paid status:', syncError);
+          // Don't fail the whole operation if job sync fails
+        }
       }
 
       toast({
@@ -322,16 +387,32 @@ export default function AdminInvoicesPage() {
         return;
       }
 
-      const { error } = await supabase
-        .from('invoices')
-        .update({
-          amount: jobTotal,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', invoice.id);
+      // Try to update the invoice amount using the RPC function
+      try {
+        const { error: rpcError } = await supabase.rpc('update_invoice_amount', {
+          invoice_id: invoice.id,
+          new_amount: jobTotal
+        });
 
-      if (error) {
-        throw error;
+        if (rpcError) {
+          console.error('Error using RPC to update invoice amount:', rpcError);
+
+          // Fallback to direct update
+          const { error } = await supabase
+            .from('invoices')
+            .update({
+              amount: jobTotal
+            })
+            .eq('id', invoice.id);
+
+          if (error) {
+            console.error('Error details from direct update:', error);
+            throw error;
+          }
+        }
+      } catch (updateError) {
+        console.error('Exception during invoice amount update:', updateError);
+        throw updateError;
       }
 
       toast({

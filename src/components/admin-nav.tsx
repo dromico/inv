@@ -30,12 +30,12 @@ const navItems = [
     href: "/dashboard/admin/subcontractors",
     icon: Users,
   },
-  {
-    title: "Invoices",
-    href: "/dashboard/admin/invoices",
-    icon: FileText,
-  },
-  {
+  //{
+  //  title: "Invoices",
+  //  href: "/dashboard/admin/invoices",
+  //  icon: FileText,
+  // },
+  /*{
     title: "Reports",
     href: "/dashboard/admin/reports",
     icon: BarChart4,
@@ -44,7 +44,7 @@ const navItems = [
     title: "Notifications",
     href: "/dashboard/admin/notifications",
     icon: Bell,
-  },
+  },*/
   {
     title: "Settings",
     href: "/dashboard/admin/settings",
