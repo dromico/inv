@@ -61,8 +61,8 @@ export async function middleware(req: NextRequest) {
   const userEmail = user.email || 'unknown';
   console.log(`Middleware: user session active for ${userEmail}`);
 
-  // Special case for romico@gmail.com - always admin
-  const isSpecialAdmin = userEmail === 'romico@gmail.com';
+  // Special case for romico@gmail.com or users with admin role in metadata
+  const isSpecialAdmin = userEmail === 'romico@gmail.com' || user.user_metadata?.role === 'admin';
 
   // RULE 1: Logged in users at / or /auth should go to appropriate dashboard
   if (pathname === '/' || pathname.startsWith('/auth')) {

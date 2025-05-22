@@ -97,11 +97,16 @@ function LoginContent() {
       // Use upsert to reduce API calls - this will create or update in a single operation
       try {
         // Prepare profile data
+        // Check if user has admin role in metadata
+        const userRole = user.user_metadata?.role === 'admin' || user.email === 'romico@gmail.com'
+          ? 'admin'
+          : 'subcontractor';
+
         const profileData = {
           id: user.id,
           company_name: user.email?.split('@')[0] || 'User',
           contact_person: user.user_metadata?.name || null,
-          role: user.email === 'romico@gmail.com' ? 'admin' : 'subcontractor',
+          role: userRole,
           updated_at: new Date()
         };
 
@@ -136,11 +141,13 @@ function LoginContent() {
         // Continue with default role if profile fetch fails
       }
 
-      // Force admin role for romico@gmail.com
+      // Determine role from profile or user metadata
       let role = profile?.role || 'subcontractor';
-      if (user.email === 'romico@gmail.com') {
+
+      // Force admin role for romico@gmail.com or if user has admin role in metadata
+      if (user.email === 'romico@gmail.com' || user.user_metadata?.role === 'admin') {
         role = 'admin';
-        console.log('Forcing admin role for romico@gmail.com');
+        console.log(`Admin role applied for user ${user.email}`);
       }
 
       console.log('User login successful:', user.email, 'Role:', role);

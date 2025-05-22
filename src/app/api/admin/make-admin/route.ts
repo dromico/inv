@@ -70,7 +70,21 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-    
+
+    // Update user metadata to include the admin role
+    const { error: metadataError } = await supabaseAdmin.auth.admin.updateUserById(
+      user.id,
+      { user_metadata: { role: 'admin' } }
+    )
+
+    if (metadataError) {
+      console.error(`Error updating metadata for ${email} (ID: ${user.id}):`, metadataError.message)
+      return NextResponse.json(
+        { success: false, message: `Error updating user metadata: ${metadataError.message}` },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
       message: `User ${email} has been made an admin successfully`
@@ -78,9 +92,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in makeAdmin API:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        message: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` 
+      {
+        success: false,
+        message: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
       },
       { status: 500 }
     )
