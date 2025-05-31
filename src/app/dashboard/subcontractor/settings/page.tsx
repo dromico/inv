@@ -36,6 +36,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 
 // Define the profile schema for validation
@@ -73,10 +74,19 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 type NotificationFormValues = z.infer<typeof notificationSchema>;
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
+// Define the email change schema
+const emailChangeSchema = z.object({
+  newEmail: z.string().email({ message: "Please enter a valid email address" }),
+});
+
+type EmailChangeFormValues = z.infer<typeof emailChangeSchema>;
+
 export default function SubcontractorSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("profile")
+  const [userEmail, setUserEmail] = useState("")
+  const [showEmailForm, setShowEmailForm] = useState(false)
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
@@ -110,6 +120,13 @@ export default function SubcontractorSettingsPage() {
     },
   });
 
+  const emailChangeForm = useForm<EmailChangeFormValues>({
+    resolver: zodResolver(emailChangeSchema),
+    defaultValues: {
+      newEmail: "",
+    },
+  });
+
   useEffect(() => {
     loadProfile()
   }, [])
@@ -117,10 +134,10 @@ export default function SubcontractorSettingsPage() {
   const loadProfile = async () => {
     try {
       setLoading(true)
-      
+
       // Get the current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
+
       if (userError || !user) {
         toast({
           variant: "destructive",
@@ -130,14 +147,19 @@ export default function SubcontractorSettingsPage() {
         setLoading(false)
         return
       }
-      
+
+      // Set the user email
+      if (user.email) {
+        setUserEmail(user.email)
+      }
+
       // Fetch the profile from the database
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
-      
+
       if (profileError) {
         console.error('Error loading profile:', profileError)
         toast({
@@ -148,7 +170,7 @@ export default function SubcontractorSettingsPage() {
         setLoading(false)
         return
       }
-      
+
       if (profileData) {
         // Reset the form with the fetched data
         profileForm.reset({
@@ -173,10 +195,10 @@ export default function SubcontractorSettingsPage() {
   const onProfileSubmit = async (data: ProfileFormValues) => {
     try {
       setSaving(true)
-      
+
       // Get the current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
+
       if (userError || !user) {
         toast({
           variant: "destructive",
@@ -185,7 +207,7 @@ export default function SubcontractorSettingsPage() {
         })
         return
       }
-      
+
       // Call the API to update the profile
       const response = await fetch('/api/subcontractor/settings/update', {
         method: 'POST',
@@ -194,13 +216,13 @@ export default function SubcontractorSettingsPage() {
         },
         body: JSON.stringify(data),
       })
-      
+
       const result = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(result.message || 'Failed to update profile')
       }
-      
+
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -220,11 +242,11 @@ export default function SubcontractorSettingsPage() {
   const onNotificationSubmit = async (data: NotificationFormValues) => {
     try {
       setSaving(true)
-      
+
       // In a real implementation, you would update the database
       // For now, we'll just simulate a delay
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       toast({
         title: "Notification preferences updated",
         description: "Your notification preferences have been updated successfully.",
@@ -244,16 +266,16 @@ export default function SubcontractorSettingsPage() {
   const onPasswordSubmit = async (data: PasswordFormValues) => {
     try {
       setSaving(true)
-      
+
       // In a real implementation, you would update the password
       // For now, we'll just simulate a delay
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       toast({
         title: "Password updated",
         description: "Your password has been updated successfully.",
       })
-      
+
       // Reset the form
       passwordForm.reset()
     } catch (error) {
@@ -262,6 +284,37 @@ export default function SubcontractorSettingsPage() {
         variant: "destructive",
         title: "Failed to update password",
         description: "There was a problem updating your password. Please try again.",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const onEmailChangeSubmit = async (data: EmailChangeFormValues) => {
+    try {
+      setSaving(true)
+
+      // In a real implementation, you would update the email
+      // For now, we'll just simulate a delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Update the displayed email
+      setUserEmail(data.newEmail)
+
+      toast({
+        title: "Email updated",
+        description: "Your email has been updated successfully.",
+      })
+
+      // Reset the form and hide it
+      emailChangeForm.reset()
+      setShowEmailForm(false)
+    } catch (error) {
+      console.error('Error updating email:', error)
+      toast({
+        variant: "destructive",
+        title: "Failed to update email",
+        description: "There was a problem updating your email. Please try again.",
       })
     } finally {
       setSaving(false)
@@ -281,7 +334,7 @@ export default function SubcontractorSettingsPage() {
           Manage your account settings and preferences
         </p>
       </div>
-      
+
       <div className="space-y-4">
         <div className="flex space-x-1 sm:space-x-2 border-b overflow-x-auto">
           <button
@@ -312,7 +365,7 @@ export default function SubcontractorSettingsPage() {
             </div>
           </button>
         </div>
-        
+
         {activeTab === 'profile' && (
           <Card>
             <CardHeader className="p-3 sm:p-5 md:p-6">
@@ -336,7 +389,7 @@ export default function SubcontractorSettingsPage() {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <FormField
                       control={profileForm.control}
@@ -365,7 +418,7 @@ export default function SubcontractorSettingsPage() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <FormField
                       control={profileForm.control}
@@ -381,7 +434,7 @@ export default function SubcontractorSettingsPage() {
                       )}
                     />
                   </div>
-                  
+
                   <FormField
                     control={profileForm.control}
                     name="address"
@@ -405,7 +458,7 @@ export default function SubcontractorSettingsPage() {
             </Form>
           </Card>
         )}
-        
+
         {activeTab === 'notifications' && (
           <Card>
             <CardHeader className="p-3 sm:p-5 md:p-6">
@@ -437,7 +490,7 @@ export default function SubcontractorSettingsPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={notificationForm.control}
                     name="job_updates"
@@ -458,7 +511,7 @@ export default function SubcontractorSettingsPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={notificationForm.control}
                     name="invoice_updates"
@@ -479,7 +532,7 @@ export default function SubcontractorSettingsPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={notificationForm.control}
                     name="system_announcements"
@@ -510,7 +563,7 @@ export default function SubcontractorSettingsPage() {
             </Form>
           </Card>
         )}
-        
+
         {activeTab === 'security' && (
           <div className="space-y-4">
             <Card>
@@ -571,7 +624,7 @@ export default function SubcontractorSettingsPage() {
                 </form>
               </Form>
             </Card>
-            
+
             <Card>
               <CardHeader className="p-3 sm:p-5 md:p-6">
                 <CardTitle>Email Preferences</CardTitle>
@@ -580,17 +633,46 @@ export default function SubcontractorSettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-5 md:p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <FormLabel>Primary Email</FormLabel>
-                    <p className="text-sm text-muted-foreground">
-                      {/* Display user email here */}
-                    </p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Primary Email</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {userEmail || "No email found"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowEmailForm(!showEmailForm)}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {showEmailForm ? 'Cancel' : 'Change Email'}
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm">
-                    <Mail className="mr-2 h-4 w-4" />
-                    Change Email
-                  </Button>
+
+                  {showEmailForm && (
+                    <Form {...emailChangeForm}>
+                      <form onSubmit={emailChangeForm.handleSubmit(onEmailChangeSubmit)} className="space-y-4">
+                        <FormField
+                          control={emailChangeForm.control}
+                          name="newEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Email Address</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Enter your new email address" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button type="submit" disabled={saving}>
+                          {saving ? 'Updating...' : 'Update Email'}
+                        </Button>
+                      </form>
+                    </Form>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -609,14 +691,14 @@ function SettingsLoadingSkeleton() {
         <Skeleton className="h-8 w-[250px] mb-2" />
         <Skeleton className="h-4 w-[350px]" />
       </div>
-      
+
       <div className="space-y-4">
         <div className="flex space-x-1 sm:space-x-2 border-b overflow-x-auto">
           <Skeleton className="h-10 w-[100px]" />
           <Skeleton className="h-10 w-[100px]" />
           <Skeleton className="h-10 w-[100px]" />
         </div>
-        
+
         <Card>
           <CardHeader className="p-3 sm:p-5 md:p-6">
             <Skeleton className="h-6 w-[200px] mb-2" />
@@ -627,7 +709,7 @@ function SettingsLoadingSkeleton() {
               <Skeleton className="h-16 w-16 rounded-full" />
               <Skeleton className="h-9 w-[120px]" />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-[100px]" />
@@ -638,7 +720,7 @@ function SettingsLoadingSkeleton() {
                 <Skeleton className="h-10 w-full" />
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-[100px]" />
@@ -649,7 +731,7 @@ function SettingsLoadingSkeleton() {
                 <Skeleton className="h-10 w-full" />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Skeleton className="h-4 w-[100px]" />
               <Skeleton className="h-20 w-full" />

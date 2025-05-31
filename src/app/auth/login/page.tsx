@@ -59,68 +59,77 @@ function LoginContent() {
   async function onSubmit(data: FormValues) {
     try {
       setIsLoading(true)
-        // Sign in with email and password
-      const signInResponse = await supabase.auth.signInWithPassword({
+
+      // Sign in with email and password - this will also set the session cookie
+      // We don't need a separate getUser call as signInWithPassword already returns the user
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
+        options: {
+          // Explicitly set cookie options to ensure proper persistence
+          cookieOptions: {
+            // Use secure cookies in production
+            secure: process.env.NODE_ENV === 'production',
+            // Set a reasonable expiry time (8 hours)
+            maxAge: 28800
+          }
+        }
       })
 
-      if (signInResponse.error) {
-        throw signInResponse.error
+      if (signInError) {
+        // Handle rate limit error specifically
+        if (signInError.message.includes('rate limit')) {
+          console.error('Rate limit error during login:', signInError)
+          throw new Error("Too many login attempts. Please wait a moment before trying again.")
+        }
+        throw signInError
       }
 
-      // Get user data
-      const { data: userData, error: getUserError } = await supabase.auth.getUser()
-
-      if (getUserError || !userData?.user) {
-        console.error('Error getting user after sign in:', getUserError)
+      if (!authData?.user) {
         throw new Error("User not found after sign in")
       }
 
-      const user = userData.user
-        // Debug user data
+      const user = authData.user
+      // Debug user data
       console.log('User authenticated:', user.email, 'User ID:', user.id);
 
-      // First check if profiles table exists and if user has a profile
+      // Check if user has a profile and create one if needed
+      // Use upsert to reduce API calls - this will create or update in a single operation
       try {
-        // Try to create a profile if it doesn't exist
-        const { data: existingProfile, error: checkError } = await supabase
+        // Prepare profile data
+        // Check if user has admin role in metadata
+        const userRole = user.user_metadata?.role === 'admin' || user.email === 'romico@gmail.com'
+          ? 'admin'
+          : 'subcontractor';
+
+        const profileData = {
+          id: user.id,
+          company_name: user.email?.split('@')[0] || 'User',
+          contact_person: user.user_metadata?.name || null,
+          role: userRole,
+          updated_at: new Date()
+        };
+
+        // Use upsert operation (insert if not exists, update if exists)
+        const { error: upsertError } = await supabase
           .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+          .upsert(profileData, {
+            onConflict: 'id',
+            ignoreDuplicates: false
+          });
 
-        if (checkError) {
-          console.log('Profile check error details:', checkError.code, checkError.message, checkError.details);
-
-          if (checkError.code === 'PGRST116') {
-            // Profile doesn't exist, create one
-            console.log('Profile not found for user, creating profile...');
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                id: user.id,
-                company_name: user.email?.split('@')[0] || 'User',
-                contact_person: user.user_metadata?.name || null,
-                role: user.email === 'romico@gmail.com' ? 'admin' : 'subcontractor',
-                created_at: new Date(),
-                updated_at: new Date()
-              });
-
-            if (insertError) {
-              console.error('Error creating profile:', insertError.code, insertError.message, insertError.details);
-            } else {
-              console.log('Profile created successfully');
-            }
-          }
+        if (upsertError) {
+          console.error('Error upserting profile:', upsertError.code, upsertError.message);
+          // Continue with login flow even if profile upsert fails
         } else {
-          console.log('Existing profile found:', existingProfile);
+          console.log('Profile upsert successful');
         }
-      } catch (profileCreationError) {
-        console.error('Unexpected error creating profile:', profileCreationError);
+      } catch (profileError) {
+        console.error('Unexpected error with profile:', profileError);
+        // Continue with login flow even if profile operation fails
       }
 
-      // Get role from profile table
+      // Get role from profile table - we need this for routing
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role, company_name')
@@ -128,15 +137,17 @@ function LoginContent() {
         .single();
 
       if (profileError) {
-        console.error('Error getting profile:', profileError.code, profileError.message, profileError.details);
+        console.error('Error getting profile:', profileError.code, profileError.message);
         // Continue with default role if profile fetch fails
       }
 
-      // Force admin role for romico@gmail.com
+      // Determine role from profile or user metadata
       let role = profile?.role || 'subcontractor';
-      if (user.email === 'romico@gmail.com') {
+
+      // Force admin role for romico@gmail.com or if user has admin role in metadata
+      if (user.email === 'romico@gmail.com' || user.user_metadata?.role === 'admin') {
         role = 'admin';
-        console.log('Forcing admin role for romico@gmail.com');
+        console.log(`Admin role applied for user ${user.email}`);
       }
 
       console.log('User login successful:', user.email, 'Role:', role);

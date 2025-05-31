@@ -9,7 +9,7 @@
       "disabled": false,
       "autoApprove": []
     },
-      "supabase": {
+    "supabase": {
       "command": "cmd",
       "args": [
         "/c",
@@ -19,6 +19,9 @@
         "@supabase/mcp-server-supabase",
         "--access-token",
         "sbp_97706dc8f5d56d535b46da1bb7ac1d50cf5657c6"
+      ],
+      "alwaysAllow": [
+        "execute_sql"
       ]
     }
   }

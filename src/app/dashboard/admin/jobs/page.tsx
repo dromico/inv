@@ -7,6 +7,7 @@ import { JobWithSubcontractor } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -34,6 +35,7 @@ import {
   CheckSquare,
   Clock,
   FileText,
+  DollarSign,
 } from "lucide-react"
 import {
   Select,
@@ -118,27 +120,269 @@ export default function AdminJobsPage() {
 
   const updateJobStatus = async (jobId: string, status: string) => {
     try {
+      // Get the current job to check its current status
+      const job = jobs.find(j => j.id === jobId);
+      if (!job) {
+        toast({
+          variant: "destructive",
+          title: "Job not found",
+          description: "The job you're trying to update could not be found.",
+        });
+        return;
+      }
+
+      // Update the local state immediately for better UX
+      setJobs(prevJobs =>
+        prevJobs.map(j =>
+          j.id === jobId ? { ...j, status } : j
+        )
+      );
+
+      // If selectedJob is set and matches the current job, update it too
+      if (selectedJob && selectedJob.id === jobId) {
+        setSelectedJob({...selectedJob, status});
+      }
+
+      // Special handling for completed status
+      if (status === 'completed') {
+        // Check if there's already an invoice for this job
+        const { data: existingInvoice, error: invoiceCheckError } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('job_id', jobId)
+          .maybeSingle();
+
+        if (invoiceCheckError) {
+          console.error('Error checking for existing invoice:', invoiceCheckError);
+        }
+
+        // If there's no invoice yet, we'll let the database trigger create it
+        if (!existingInvoice) {
+          console.log('No existing invoice found. The database trigger will create one.');
+        } else {
+          console.log('Existing invoice found:', existingInvoice.id);
+        }
+      }
+
+      // Update the job status in the database
       const { error } = await supabase
         .from('jobs')
-        .update({ status })
-        .eq('id', jobId)
+        .update({
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
 
       if (error) {
-        throw error
+        console.error('Supabase error details:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+
+        // Revert the local state change if the update fails
+        setJobs(prevJobs =>
+          prevJobs.map(j =>
+            j.id === jobId ? { ...j, status: job.status } : j
+          )
+        );
+
+        // Also revert selectedJob if it was updated
+        if (selectedJob && selectedJob.id === jobId) {
+          setSelectedJob({...selectedJob, status: job.status});
+        }
+
+        throw error;
       }
 
       toast({
         title: "Status updated",
         description: `Job status updated to ${status}`,
-      })
+      });
 
-      loadJobs()
+      // Refresh the jobs list to ensure we have the latest data
+      loadJobs();
     } catch (error) {
-      console.error('Error updating job status:', error)
+      console.error('Error updating job status:', error);
+
+      // Check if the error is a PostgreSQL error (likely a constraint violation)
+      let errorMessage = 'Unknown error occurred';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Log additional details if available
+        if ('code' in error) {
+          console.error('Error code:', (error as any).code);
+        }
+        if ('details' in error) {
+          console.error('Error details:', (error as any).details);
+        }
+      }
+
       toast({
         variant: "destructive",
         title: "Failed to update status",
-        description: "There was a problem updating the job status. Please try again.",
+        description: `There was a problem updating the job status: ${errorMessage}. Please try again.`,
+      });
+    }
+  }
+
+  const updateJobPaidStatus = async (jobId: string, paid: boolean) => {
+    try {
+      // Only allow updating paid status for completed jobs
+      const job = jobs.find(j => j.id === jobId)
+      if (job?.status !== 'completed') {
+        toast({
+          variant: "destructive",
+          title: "Cannot update paid status",
+          description: "Only completed jobs can be marked as paid.",
+        })
+        return
+      }
+
+      // Update the local state immediately for better UX
+      setJobs(prevJobs =>
+        prevJobs.map(j =>
+          j.id === jobId ? { ...j, paid } : j
+        )
+      )
+
+      // If selectedJob is set and matches the current job, update it too
+      if (selectedJob && selectedJob.id === jobId) {
+        setSelectedJob({...selectedJob, paid})
+      }
+
+      // First, try to directly update the invoice status if it exists
+      // This avoids the type mismatch issue by using the update_invoice_status function
+      const { data: invoiceData } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('job_id', jobId)
+        .single()
+
+      if (invoiceData?.id) {
+        // Use RPC to call the update_invoice_status function
+        const { error: rpcError } = await supabase.rpc(
+          'update_invoice_status',
+          {
+            invoice_id: invoiceData.id,
+            new_status: paid ? 'paid' : 'unpaid'
+          }
+        )
+
+        if (rpcError) {
+          console.error('Error updating invoice status via RPC:', rpcError)
+          // Continue to try updating the job directly
+        } else {
+          // If RPC was successful, we're done
+          toast({
+            title: paid ? "Payment recorded" : "Payment status updated",
+            description: paid ? "Job has been marked as paid" : "Job has been marked as unpaid",
+          })
+
+          // Refresh the jobs list to ensure we have the latest data
+          loadJobs()
+          return
+        }
+      }
+
+      // Fallback: Update the job in the database directly
+      const { error } = await supabase
+        .from('jobs')
+        .update({ paid: paid })
+        .eq('id', jobId)
+        .eq('status', 'completed') // Ensure we're only updating completed jobs
+
+      if (error) {
+        console.error('Supabase error details:', error)
+        console.error('Error code:', error.code)
+        console.error('Error message:', error.message)
+        console.error('Error details:', error.details)
+
+        // Revert the local state change if the update fails
+        setJobs(prevJobs =>
+          prevJobs.map(j =>
+            j.id === jobId ? { ...j, paid: !paid } : j
+          )
+        )
+
+        // Also revert selectedJob if it was updated
+        if (selectedJob && selectedJob.id === jobId) {
+          setSelectedJob({...selectedJob, paid: !paid})
+        }
+
+        throw error
+      }
+
+      toast({
+        title: paid ? "Payment recorded" : "Payment status updated",
+        description: paid ? "Job has been marked as paid" : "Job has been marked as unpaid",
+      })
+
+      // Create a notification when a job is marked as paid
+      if (paid) {
+        try {
+          // Check if the notifications table exists by attempting a simple query
+          const { error: checkError } = await supabase
+            .from('notifications')
+            .select('id')
+            .limit(1)
+
+          // If the table doesn't exist or there's an error, log it but don't fail the whole operation
+          if (checkError) {
+            console.warn('Notifications table may not exist yet:', checkError.message)
+            console.log(`Would have created notification for paid job ${jobId} if table existed`)
+          } else {
+            // Create a notification in the database
+            const { error: notificationError } = await supabase
+              .from('notifications')
+              .insert({
+                recipient_id: job.subcontractor_id,
+                message: `Payment for job ${job.job_type} has been processed and marked as paid.`,
+                related_entity_type: 'job',
+                related_entity_id: jobId,
+                read: false
+              })
+
+            if (notificationError) {
+              console.error('Error creating notification:', notificationError)
+            } else {
+              console.log(`Created notification for paid job ${jobId}`)
+            }
+          }
+        } catch (notificationError) {
+          // Log the error but don't fail the whole operation
+          console.error('Error creating notification:', notificationError)
+          console.log('Job was still marked as paid successfully')
+        }
+      }
+
+      // Refresh the jobs list to ensure we have the latest data
+      loadJobs()
+    } catch (error) {
+      // Log the detailed error for debugging
+      console.error('Error updating job paid status:', error)
+
+      // Check if the error is a PostgreSQL error (likely a constraint violation)
+      let errorMessage = 'Unknown error occurred';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Log additional details if available
+        if ('code' in error) {
+          console.error('Error code:', (error as any).code);
+        }
+        if ('details' in error) {
+          console.error('Error details:', (error as any).details);
+        }
+      }
+
+      // Show a more detailed error message to the user
+      toast({
+        variant: "destructive",
+        title: "Failed to update payment status",
+        description: `There was a problem updating the job payment status: ${errorMessage}. Please try again.`,
       })
     }
   }
@@ -289,6 +533,25 @@ export default function AdminJobsPage() {
 
                       <div className="text-muted-foreground">Amount:</div>
                       <div className="font-medium">{formatCurrency(calculateTotalAmount(job))}</div>
+
+                      {job.status === 'completed' && (
+                        <>
+                          <div className="text-muted-foreground">Payment Status:</div>
+                          <div className="flex items-center">
+                            <Switch
+                              checked={!!job.paid}
+                              onCheckedChange={(checked) => {
+                                // Call the update function directly
+                                updateJobPaidStatus(job.id, checked);
+                              }}
+                              className="mr-2 h-[18px] w-[32px]"
+                              // Add a key to force re-render when paid status changes
+                              key={`switch-mobile-${job.id}-${job.paid}`}
+                            />
+                            <span>{job.paid ? 'Paid' : 'Unpaid'}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
@@ -319,6 +582,7 @@ export default function AdminJobsPage() {
                     <TableHead>Date Range</TableHead>
                     <TableHead className="text-right">Amount (RM)</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Paid</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -338,6 +602,25 @@ export default function AdminJobsPage() {
                         }`}>
                           {job.status}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {job.status === 'completed' ? (
+                          <div className="flex items-center">
+                            <Switch
+                              checked={!!job.paid}
+                              onCheckedChange={(checked) => {
+                                // Call the update function directly
+                                updateJobPaidStatus(job.id, checked);
+                              }}
+                              className="mr-2"
+                              // Add a key to force re-render when paid status changes
+                              key={`switch-${job.id}-${job.paid}`}
+                            />
+                            <span className="text-xs">{job.paid ? 'Yes' : 'No'}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -376,6 +659,26 @@ export default function AdminJobsPage() {
                               <CheckSquare className="mr-2 h-4 w-4 text-green-500" />
                               Set as Completed
                             </DropdownMenuItem>
+                            {job.status === 'completed' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Payment Status</DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  disabled={!!job.paid}
+                                  onClick={() => updateJobPaidStatus(job.id, true)}
+                                >
+                                  <DollarSign className="mr-2 h-4 w-4 text-green-500" />
+                                  Mark as Paid
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={!job.paid}
+                                  onClick={() => updateJobPaidStatus(job.id, false)}
+                                >
+                                  <DollarSign className="mr-2 h-4 w-4 text-red-500" />
+                                  Mark as Unpaid
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             {(job.status === 'completed' || job.status === 'in-progress') && (
                               <>
                                 <DropdownMenuSeparator />
@@ -523,6 +826,35 @@ export default function AdminJobsPage() {
                       {selectedJob.status}
                     </div>
                   </div>
+                  {selectedJob.status === 'completed' && (
+                    <div>
+                      <h3 className="font-medium text-sm text-muted-foreground">Payment Status</h3>
+                      <div className="flex items-center mt-1">
+                        <Switch
+                          checked={!!selectedJob.paid}
+                          onCheckedChange={(checked) => {
+                            // Only proceed if the job is completed
+                            if (selectedJob.status === 'completed') {
+                              // Update the dialog state immediately for better UX
+                              setSelectedJob({...selectedJob, paid: checked})
+                              // Then update the database
+                              updateJobPaidStatus(selectedJob.id, checked)
+                            } else {
+                              toast({
+                                variant: "destructive",
+                                title: "Cannot update paid status",
+                                description: "Only completed jobs can be marked as paid.",
+                              })
+                            }
+                          }}
+                          className="mr-2"
+                          // Add a key to force re-render when paid status changes
+                          key={`switch-dialog-${selectedJob.id}-${selectedJob.paid}`}
+                        />
+                        <span className="text-sm">{selectedJob.paid ? 'Paid' : 'Unpaid'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

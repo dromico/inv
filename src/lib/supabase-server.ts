@@ -9,27 +9,55 @@ import type { Database } from '@/types/database'
 // This function is designed to be used only in the App Router
 export async function createServerComponentClient() {
   console.log("Creating server component client with cookies")
-  
+
   try {
     // Import cookies from next/headers
     const { cookies } = await import('next/headers')
-    
+
     // Create the Supabase client with the cookie store using a factory function
     // This properly handles cookies as recommended by Next.js (avoids synchronous cookies access)
     return createSupabaseServerComponentClient<Database>({
-      cookies
+      cookies,
+      options: {
+        // Configure auth to ensure proper session handling
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+          flowType: 'pkce', // Use PKCE flow for better security
+        },
+        // Add global error handler for rate limit detection
+        global: {
+          fetch: async (url, options) => {
+            try {
+              const response = await fetch(url, options)
+
+              // Check for rate limit errors
+              if (response.status === 429) {
+                console.warn('Rate limit reached in server component client:', url.toString())
+              }
+
+              return response
+            } catch (error) {
+              console.error('Error in server component client fetch:', error)
+              throw error
+            }
+          }
+        }
+      }
     })
   } catch (error) {
     console.error("Error creating server component client with cookies:", error)
     console.log("Falling back to direct client creation")
-    
+
     // Fallback to direct client creation if cookies are not available
     return createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         auth: {
-          persistSession: false
+          persistSession: false,
+          autoRefreshToken: false
         }
       }
     )

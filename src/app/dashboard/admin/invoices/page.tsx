@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs" // Correct import for client components
 import { Database, Json } from "@/types/database"
 import { useToast } from "@/hooks/use-toast"
+import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PDFButtonLoading } from "@/components/pdf-loading"
@@ -32,9 +32,10 @@ import {
   MoreHorizontal,
   Search,
   CheckCircle,
-  Send, // For 'sent' status
-  FileText, // For 'generated' status
+  AlertCircle, // For 'overdue' status
+  FileText, // For 'unpaid' status
   Download,
+  RefreshCw, // For refresh button
 } from "lucide-react"
 import {
   Select,
@@ -52,21 +53,40 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Define types based on the actual query structure
-type InvoiceRecord = Database['public']['Tables']['invoices']['Row']
-type JobRecord = Database['public']['Tables']['jobs']['Row']
+// Define types based on the actual database schema
 type ProfileRecord = Database['public']['Tables']['profiles']['Row']
 
-// Simplified and corrected type for the joined data
-// Assuming 'jobs' might not have 'description' directly, let's use 'job_type' or fallback
-interface InvoiceWithDetails extends InvoiceRecord {
-  jobs: {
-    id: string;
-    job_type: string | null;
-    location: string | null;
-    line_items: Json[] | null;
-  } | null; // Include line_items with proper Json type
+// Custom interface for the invoice data from the database
+interface InvoiceRecord {
+  id: string;
+  job_id: string;
+  invoice_number: string;
+  issued_date: string;
+  due_date: string;
+  amount: number;
+  status: string; // 'unpaid', 'paid', 'overdue'
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+// Comprehensive type for the joined job data
+interface JobDetails {
+  id: string;
+  job_type: string | null;
+  location: string | null;
+  line_items: Json[] | null;
+  status: string; // 'pending', 'in-progress', 'completed'
+  total: number | null;
+  paid: boolean | null;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
   profiles: Pick<ProfileRecord, 'id' | 'company_name'> | null;
+}
+
+// Simplified and corrected type for the joined data
+interface InvoiceWithDetails extends InvoiceRecord {
+  jobs: JobDetails | null;
 }
 
 // Type for subcontractors list
@@ -76,13 +96,15 @@ export default function AdminInvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all") // 'generated', 'sent', 'paid'
+  const [statusFilter, setStatusFilter] = useState<string>("all") // 'unpaid', 'paid', 'overdue'
   const [subcontractorFilter, setSubcontractorFilter] = useState<string>("all")
   const [subcontractors, setSubcontractors] = useState<SubcontractorInfo[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalInvoices, setTotalInvoices] = useState(0)
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithDetails | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null)
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const invoicesPerPage = 10
 
   const { toast } = useToast()
@@ -114,15 +136,29 @@ export default function AdminInvoicesPage() {
     try {
       setLoading(true);
 
-      // Build the base query
+      // Build the base query - only show invoices for completed jobs
+      // Use a more comprehensive select to ensure we have all the job data we need
       let query = supabase
         .from('invoices')
         .select(`
           *,
-          jobs ( id, job_type, location, line_items ),
-          profiles:subcontractor_id ( id, company_name )
+          jobs (
+            id,
+            job_type,
+            location,
+            line_items,
+            status,
+            total,
+            paid,
+            start_date,
+            end_date,
+            notes,
+            profiles:subcontractor_id ( id, company_name )
+          )
         `, { count: 'exact' })
-        .order('invoice_date', { ascending: false });
+        .order('created_at', { ascending: false })
+        // Filter to only show invoices for completed jobs
+        .eq('jobs.status', 'completed');
 
       // Apply status filter if selected
       if (statusFilter !== "all") {
@@ -131,14 +167,12 @@ export default function AdminInvoicesPage() {
 
       // Apply subcontractor filter if selected
       if (subcontractorFilter !== "all") {
-        query = query.eq('subcontractor_id', subcontractorFilter);
+        // We need to filter on the jobs.subcontractor_id field
+        query = query.eq('jobs.subcontractor_id', subcontractorFilter);
       }
 
       // Apply search filter if provided
       if (searchQuery) {
-        // Create search pattern with wildcards
-        const searchPattern = `%${searchQuery}%`;
-
         // Use separate filters for each condition
         // Note: We can't directly filter on foreign tables in the OR clause
         // So we'll use a simpler approach for now
@@ -173,8 +207,8 @@ export default function AdminInvoicesPage() {
               : false;
 
             // Check company_name (with null/undefined handling)
-            const companyMatch = invoice.profiles?.company_name
-              ? invoice.profiles.company_name.toLowerCase().includes(searchLower)
+            const companyMatch = invoice.jobs?.profiles?.company_name
+              ? invoice.jobs.profiles.company_name.toLowerCase().includes(searchLower)
               : false;
 
             // Return true if either matches
@@ -182,8 +216,8 @@ export default function AdminInvoicesPage() {
           });
         }
 
-        // Ensure data matches the expected type
-        setInvoices(filteredData as InvoiceWithDetails[]);
+        // Convert the data to match our expected type
+        setInvoices(filteredData as unknown as InvoiceWithDetails[]);
 
         // If we're doing client-side filtering, we need to adjust the total count
         if (searchQuery) {
@@ -210,6 +244,38 @@ export default function AdminInvoicesPage() {
   }, [supabase, toast, currentPage, statusFilter, subcontractorFilter, searchQuery, invoicesPerPage]);
 
 
+  // Function to manually refresh data
+  const refreshData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadInvoices();
+      setLastRefreshed(new Date());
+      toast({
+        title: "Data refreshed",
+        description: "Invoice data has been updated with the latest job information.",
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast({
+        variant: "destructive",
+        title: "Refresh failed",
+        description: "There was a problem refreshing the data. Please try again.",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadInvoices, toast]);
+
+  // Auto-refresh data every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadInvoices();
+      setLastRefreshed(new Date());
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+
+    return () => clearInterval(interval);
+  }, [loadInvoices]);
+
   useEffect(() => {
     loadInvoices();
     loadSubcontractors();
@@ -217,13 +283,78 @@ export default function AdminInvoicesPage() {
 
   const updateInvoiceStatus = async (invoiceId: string, status: string) => {
     try {
-      const { error } = await supabase
+      // Get the invoice with job details before updating
+      const { data: invoice, error: fetchError } = await supabase
         .from('invoices')
-        .update({ status: status, updated_at: new Date().toISOString() }) // Also update updated_at
-        .eq('id', invoiceId);
+        .select(`
+          id,
+          job_id,
+          status,
+          jobs (
+            id,
+            status
+          )
+        `)
+        .eq('id', invoiceId)
+        .single();
 
-      if (error) {
-        throw error;
+      if (fetchError) {
+        console.error('Error fetching invoice details:', fetchError);
+        throw fetchError;
+      }
+
+      // Try to update the invoice status using the RPC function with proper type casting
+      try {
+        const { error: rpcError } = await supabase.rpc('update_invoice_status', {
+          invoice_id: invoiceId,
+          new_status: status
+        });
+
+        if (rpcError) {
+          console.error('Error using RPC to update invoice status:', rpcError);
+
+          // Fallback to direct update with options
+          const { error } = await supabase
+            .from('invoices')
+            .update({ status: status }, {
+              // Use PostgreSQL casting to ensure the status is treated as invoice_status enum
+              returning: "minimal",
+              count: "exact"
+            })
+            .eq('id', invoiceId);
+
+          if (error) {
+            console.error('Error details from direct update:', error);
+            throw error;
+          }
+        }
+      } catch (updateError) {
+        console.error('Exception during invoice status update:', updateError);
+        throw updateError;
+      }
+
+      // Update corresponding job paid status if invoice status is changing to/from 'paid'
+      if (invoice && invoice.jobs && invoice.jobs.status === 'completed') {
+        try {
+          // Only sync if the job is completed
+          const jobId = invoice.job_id;
+          const isPaid = status === 'paid';
+
+          // Update job paid status
+          const { error: jobUpdateError } = await supabase
+            .from('jobs')
+            .update({ paid: isPaid })
+            .eq('id', jobId);
+
+          if (jobUpdateError) {
+            console.error('Error updating job paid status:', jobUpdateError);
+          } else {
+            console.log(`Job paid status updated to ${isPaid}`);
+          }
+        } catch (syncError) {
+          console.error('Error syncing job paid status:', syncError);
+          // Don't fail the whole operation if job sync fails
+        }
       }
 
       toast({
@@ -238,6 +369,72 @@ export default function AdminInvoicesPage() {
         variant: "destructive",
         title: "Failed to update status",
         description: "There was a problem updating the invoice status. Please try again.",
+      });
+    }
+  };
+
+  // Function to update invoice amount to match job total
+  const syncInvoiceAmount = async (invoice: InvoiceWithDetails) => {
+    try {
+      const jobTotal = calculateTotalAmount(invoice.jobs);
+
+      // Only update if the amounts are different
+      if (invoice.amount === jobTotal) {
+        toast({
+          title: "No update needed",
+          description: "Invoice amount already matches job total.",
+        });
+        return;
+      }
+
+      // Try to update the invoice amount using the RPC function
+      try {
+        const { error: rpcError } = await supabase.rpc('update_invoice_amount', {
+          invoice_id: invoice.id,
+          new_amount: jobTotal
+        });
+
+        if (rpcError) {
+          console.error('Error using RPC to update invoice amount:', rpcError);
+
+          // Fallback to direct update
+          const { error } = await supabase
+            .from('invoices')
+            .update({
+              amount: jobTotal
+            })
+            .eq('id', invoice.id);
+
+          if (error) {
+            console.error('Error details from direct update:', error);
+            throw error;
+          }
+        }
+      } catch (updateError) {
+        console.error('Exception during invoice amount update:', updateError);
+        throw updateError;
+      }
+
+      toast({
+        title: "Amount synchronized",
+        description: `Invoice amount updated to match job total: ${formatCurrency(jobTotal)}`,
+      });
+
+      // If we have a selected invoice, update it in the state
+      if (selectedInvoice && selectedInvoice.id === invoice.id) {
+        setSelectedInvoice({
+          ...selectedInvoice,
+          amount: jobTotal
+        });
+      }
+
+      loadInvoices(); // Reload invoices to reflect the change
+    } catch (error) {
+      console.error('Error updating invoice amount:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to update amount",
+        description: "There was a problem updating the invoice amount. Please try again.",
       });
     }
   };
@@ -264,6 +461,16 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  const formatTime = (date: Date) => {
+    try {
+      // Use date-fns format with explicit 12-hour time with uppercase AM/PM
+      return format(date, 'h:mm:ss a');
+    } catch (e) {
+      console.error("Error formatting time:", date, e);
+      return 'Invalid Time';
+    }
+  };
+
   const formatCurrency = (amount: number | null) => {
     if (amount === null || amount === undefined) return 'N/A';
     return new Intl.NumberFormat('en-MY', {
@@ -271,6 +478,37 @@ export default function AdminInvoicesPage() {
       currency: 'MYR',
       minimumFractionDigits: 2
     }).format(amount);
+  };
+
+  // Calculate the total amount from job data - ensures consistency with jobs page
+  const calculateTotalAmount = (job: JobDetails | null): number => {
+    if (!job) return 0;
+
+    // Start with the base job amount
+    let total = job.total || 0;
+
+    // If there are line items, add their totals
+    if (job.line_items && Array.isArray(job.line_items)) {
+      try {
+        // Calculate total from all line items
+        const lineItemsTotal = job.line_items.reduce((sum: number, item: any) => {
+          if (!item) return sum;
+
+          const quantity = Number(item.unit_quantity || item.quantity || 0);
+          const price = Number(item.unit_price || 0);
+          return sum + (quantity * price);
+        }, 0);
+
+        // If we have line items, use their total instead of the base total
+        if (job.line_items.length > 0) {
+          return lineItemsTotal;
+        }
+      } catch (error) {
+        console.error('Error calculating total from line items:', error);
+      }
+    }
+
+    return total;
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,9 +543,9 @@ export default function AdminInvoicesPage() {
     switch (status) {
       case 'paid':
         return { icon: CheckCircle, color: 'text-green-800', bg: 'bg-green-100' };
-      case 'sent':
-        return { icon: Send, color: 'text-blue-800', bg: 'bg-blue-100' };
-      case 'generated':
+      case 'overdue':
+        return { icon: AlertCircle, color: 'text-red-800', bg: 'bg-red-100' };
+      case 'unpaid':
       default:
         return { icon: FileText, color: 'text-amber-800', bg: 'bg-amber-100' };
     }
@@ -317,9 +555,9 @@ export default function AdminInvoicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Manage Invoices</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Completed Job Invoices</h2>
         <p className="text-muted-foreground">
-          View and manage all subcontractor invoices
+          View and manage invoices for completed subcontractor jobs
         </p>
       </div>
 
@@ -349,9 +587,9 @@ export default function AdminInvoicesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="generated">Generated</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -372,6 +610,24 @@ export default function AdminInvoicesPage() {
             </SelectContent>
           </Select>
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={refreshData}
+          disabled={isRefreshing}
+          title="Refresh data from jobs"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="sr-only">Refresh</span>
+        </Button>
+      </div>
+
+      {/* Last refreshed indicator */}
+      <div className="text-xs text-muted-foreground">
+        Last refreshed: {formatTime(lastRefreshed)} •
+        <span className="ml-1 italic">
+          Data is automatically synchronized with the jobs page every 5 minutes
+        </span>
       </div>
 
       <div className="rounded-md border">
@@ -387,52 +643,69 @@ export default function AdminInvoicesPage() {
                 {invoices.map((invoice) => {
                   const statusStyle = getStatusStyle(invoice.status);
                   return (
-                    <div key={invoice.id} className="rounded-lg border p-4 space-y-3">
+                    <div key={invoice.id} className="rounded-lg border shadow-sm p-4 space-y-3 bg-white">
                       <div className="flex justify-between items-start">
-                        <h3 className="font-medium">{formatDate(invoice.invoice_date)}</h3>
+                        <div>
+                          <h3 className="font-medium text-base">{formatDate(invoice.created_at)}</h3>
+                          <p className="text-xs text-muted-foreground">Invoice #{invoice.invoice_number}</p>
+                        </div>
                         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                           <statusStyle.icon className="mr-1 h-3 w-3" />
                           {invoice.status || 'N/A'}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <p className="text-muted-foreground">Subcontractor</p>
-                          <p className="truncate">{invoice.profiles?.company_name || 'N/A'}</p>
+                          <p className="text-muted-foreground text-xs">Subcontractor</p>
+                          <p className="truncate font-medium">{invoice.jobs?.profiles?.company_name || 'N/A'}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Job Type</p>
-                          <p className="truncate">{invoice.jobs?.job_type || 'N/A'}</p>
+                          <p className="text-muted-foreground text-xs">Job Type</p>
+                          <p className="truncate font-medium">{invoice.jobs?.job_type || 'N/A'}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Amount</p>
-                          <p className="font-medium">{formatCurrency(invoice.total_amount)}</p>
+                          <p className="text-muted-foreground text-xs">Amount</p>
+                          <p className="font-medium text-base">{formatCurrency(calculateTotalAmount(invoice.jobs))}</p>
+                          {invoice.amount !== calculateTotalAmount(invoice.jobs) && (
+                            <p className="text-xs text-amber-600">
+                              *Updated from job data
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Due Date</p>
+                          <p className="font-medium">{formatDate(invoice.due_date)}</p>
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
-                          Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsGeneratingPDF(invoice.job_id);
-                            window.open(`/api/admin/invoices/${invoice.job_id}`, '_blank');
-                            setTimeout(() => setIsGeneratingPDF(null), 1000);
-                          }}
-                          disabled={isGeneratingPDF === invoice.job_id}
-                        >
-                          {isGeneratingPDF === invoice.job_id ? (
-                            <PDFButtonLoading />
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4 mr-1" /> PDF
-                            </>
-                          )}
-                        </Button>
+                      <div className="flex justify-between items-center pt-2 border-t mt-2">
+                        <div className="text-xs text-muted-foreground">
+                          Job Status: <span className="font-medium">{invoice.jobs?.status}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(invoice)}>
+                            Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIsGeneratingPDF(invoice.job_id);
+                              window.open(`/api/admin/invoices/${invoice.job_id}`, '_blank');
+                              setTimeout(() => setIsGeneratingPDF(null), 1000);
+                            }}
+                            disabled={isGeneratingPDF === invoice.job_id}
+                          >
+                            {isGeneratingPDF === invoice.job_id ? (
+                              <PDFButtonLoading />
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4 mr-1" /> PDF
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -445,9 +718,11 @@ export default function AdminInvoicesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Subcontractor</TableHead>
-                    <TableHead>Job Type/Desc</TableHead>
+                    <TableHead>Job Type</TableHead>
+                    <TableHead>Due Date</TableHead>
                     <TableHead className="text-right">Amount (RM)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -457,12 +732,25 @@ export default function AdminInvoicesPage() {
                   {invoices.map((invoice) => {
                     const statusStyle = getStatusStyle(invoice.status);
                     return (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">{formatDate(invoice.invoice_date)}</TableCell>
-                        <TableCell>{invoice.profiles?.company_name || 'N/A'}</TableCell>
-                        {/* Display job_type or fallback */}
-                        <TableCell>{invoice.jobs?.job_type || 'N/A'}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
+                      <TableRow key={invoice.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                        <TableCell>{formatDate(invoice.created_at)}</TableCell>
+                        <TableCell>{invoice.jobs?.profiles?.company_name || 'N/A'}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span>{invoice.jobs?.job_type || 'N/A'}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Job Status: {invoice.jobs?.status}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(calculateTotalAmount(invoice.jobs))}
+                          {invoice.amount !== calculateTotalAmount(invoice.jobs) && (
+                            <p className="text-xs text-amber-600">*Updated</p>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
                             <statusStyle.icon className="mr-1 h-3 w-3" />
@@ -485,18 +773,18 @@ export default function AdminInvoicesPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel>Change Status</DropdownMenuLabel>
                               <DropdownMenuItem
-                                disabled={invoice.status === 'generated'}
-                                onClick={() => updateInvoiceStatus(invoice.id, 'generated')}
+                                disabled={invoice.status === 'unpaid'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'unpaid')}
                               >
                                 <FileText className="mr-2 h-4 w-4 text-amber-500" />
-                                Mark as Generated
+                                Mark as Unpaid
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                disabled={invoice.status === 'sent'}
-                                onClick={() => updateInvoiceStatus(invoice.id, 'sent')}
+                                disabled={invoice.status === 'overdue'}
+                                onClick={() => updateInvoiceStatus(invoice.id, 'overdue')}
                               >
-                                <Send className="mr-2 h-4 w-4 text-blue-500" />
-                                Mark as Sent
+                                <AlertCircle className="mr-2 h-4 w-4 text-red-500" />
+                                Mark as Overdue
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={invoice.status === 'paid'}
@@ -506,6 +794,14 @@ export default function AdminInvoicesPage() {
                                 Mark as Paid
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              {invoice.amount !== calculateTotalAmount(invoice.jobs) && (
+                                <DropdownMenuItem
+                                  onClick={() => syncInvoiceAmount(invoice)}
+                                >
+                                  <RefreshCw className="mr-2 h-4 w-4 text-blue-500" />
+                                  Sync Amount with Job
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => {
                                   setIsGeneratingPDF(invoice.job_id);
@@ -598,63 +894,97 @@ export default function AdminInvoicesPage() {
       {/* Invoice details dialog */}
       {selectedInvoice && (
         <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
-          <DialogContent className="max-w-[95vw] sm:max-w-[525px]">
+          <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Invoice Details</DialogTitle>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Invoice #{selectedInvoice.invoice_number}</span>
+                <div className="inline-flex items-center">
+                  {(() => {
+                    const statusStyle = getStatusStyle(selectedInvoice.status);
+                    return (
+                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusStyle.bg} ${statusStyle.color}`}>
+                        <statusStyle.icon className="mr-2 h-4 w-4" />
+                        {selectedInvoice.status || 'N/A'}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </DialogTitle>
               <DialogDescription>
-                Detailed information for invoice generated on {formatDate(selectedInvoice.invoice_date)}.
+                Invoice created on {formatDate(selectedInvoice.created_at)} for completed job
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Invoice ID:</div>
-                <div className="col-span-2 sm:col-span-3 text-xs text-muted-foreground break-all">{selectedInvoice.id}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job ID:</div>
-                <div className="col-span-2 sm:col-span-3 text-xs text-muted-foreground break-all">{selectedInvoice.job_id}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Subcontractor:</div>
-                <div className="col-span-2 sm:col-span-3">{selectedInvoice.profiles?.company_name || 'N/A'}</div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job Desc:</div>
-                {/* Display job_type or fallback */}
-                <div className="col-span-2 sm:col-span-3">{selectedInvoice.jobs?.job_type || 'N/A'}</div>
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Job Location:</div>
-                <div className="col-span-3">{selectedInvoice.jobs?.location || 'N/A'}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Invoice Date:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.invoice_date)}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Amount:</div>
-                <div className="col-span-3 font-bold">{formatCurrency(selectedInvoice.total_amount)}</div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Status:</div>
-                <div className="col-span-3">
-                   {(() => {
-                       const statusStyle = getStatusStyle(selectedInvoice.status);
-                       return (
-                           <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.color}`}>
-                             <statusStyle.icon className="mr-1 h-3 w-3" />
-                             {selectedInvoice.status || 'N/A'}
-                           </div>
-                       );
-                   })()}
+
+            <div className="grid gap-6 py-4">
+              {/* Invoice Information Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Invoice Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Invoice Number</p>
+                    <p className="font-medium">{selectedInvoice.invoice_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Invoice Date</p>
+                    <p className="font-medium">{formatDate(selectedInvoice.issued_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Due Date</p>
+                    <p className="font-medium">{formatDate(selectedInvoice.due_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Amount</p>
+                    <p className="font-medium text-lg">{formatCurrency(calculateTotalAmount(selectedInvoice.jobs))}</p>
+                    {selectedInvoice.amount !== calculateTotalAmount(selectedInvoice.jobs) && (
+                      <p className="text-xs text-amber-600">
+                        *Updated from job data (original: {formatCurrency(selectedInvoice.amount)})
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Created At:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.created_at)}</div>
-              </div>               <div className="grid grid-cols-4 items-center gap-4">
-                <div className="font-medium">Last Updated:</div>
-                <div className="col-span-3">{formatDate(selectedInvoice.updated_at)}</div>
+
+              {/* Job Information Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Job Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Job Type</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.job_type || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Job Status</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.status || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.location || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Subcontractor</p>
+                    <p className="font-medium">{selectedInvoice.jobs?.profiles?.company_name || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* System Information Section */}
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Invoice ID:</span>
+                  <span className="font-mono">{selectedInvoice.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Job ID:</span>
+                  <span className="font-mono">{selectedInvoice.job_id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Created:</span>
+                  <span>{formatDate(selectedInvoice.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Last Updated:</span>
+                  <span>{formatDate(selectedInvoice.updated_at)}</span>
+                </div>
               </div>
 
               {/* Line Items Section */}
@@ -699,24 +1029,68 @@ export default function AdminInvoicesPage() {
                 )}
               </div>
             </div>
-            <DialogFooter>
-               <Button variant="outline" onClick={() => setSelectedInvoice(null)}>Close</Button>
-               <Button
-                 onClick={() => {
-                   setIsGeneratingPDF(selectedInvoice.job_id);
-                   window.open(`/api/admin/invoices/${selectedInvoice.job_id}`, '_blank');
-                   setTimeout(() => setIsGeneratingPDF(null), 1000);
-                 }}
-                 disabled={isGeneratingPDF === selectedInvoice.job_id}
-               >
-                 {isGeneratingPDF === selectedInvoice.job_id ? (
-                   <PDFButtonLoading />
-                 ) : (
-                   <>
-                     <Download className="mr-2 h-4 w-4" /> Download PDF
-                   </>
-                 )}
-               </Button>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => updateInvoiceStatus(selectedInvoice.id, 'unpaid')}
+                  disabled={selectedInvoice.status === 'unpaid'}
+                >
+                  <FileText className="mr-2 h-4 w-4 text-amber-500" />
+                  Mark Unpaid
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => updateInvoiceStatus(selectedInvoice.id, 'overdue')}
+                  disabled={selectedInvoice.status === 'overdue'}
+                >
+                  <AlertCircle className="mr-2 h-4 w-4 text-red-500" />
+                  Mark Overdue
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => updateInvoiceStatus(selectedInvoice.id, 'paid')}
+                  disabled={selectedInvoice.status === 'paid'}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                  Mark Paid
+                </Button>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
+                {selectedInvoice.amount !== calculateTotalAmount(selectedInvoice.jobs) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => syncInvoiceAmount(selectedInvoice)}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" /> Sync Amount
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setSelectedInvoice(null)}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsGeneratingPDF(selectedInvoice.job_id);
+                    window.open(`/api/admin/invoices/${selectedInvoice.job_id}`, '_blank');
+                    setTimeout(() => setIsGeneratingPDF(null), 1000);
+                  }}
+                  disabled={isGeneratingPDF === selectedInvoice.job_id}
+                >
+                  {isGeneratingPDF === selectedInvoice.job_id ? (
+                    <PDFButtonLoading />
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" /> Download PDF
+                    </>
+                  )}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

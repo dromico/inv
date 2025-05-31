@@ -24,6 +24,7 @@ export interface Job {
   created_at: string;
   updated_at: string | null;
   line_items?: any; // Using any for flexibility with different line item formats
+  paid?: boolean; // Whether the job has been paid
 }
 
 export interface JobWithSubcontractor extends Job {

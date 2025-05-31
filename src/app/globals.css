@@ -101,8 +101,43 @@
       transform: translateY(0);
     }
   }
-  
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+      max-height: 500px;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+      max-height: 0;
+    }
+  }
+
+  @keyframes checkmarkPop {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
   .animate-fadeIn {
     animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-fadeOut {
+    animation: fadeOut 0.5s ease-out forwards;
+  }
+
+  .animate-checkmark {
+    animation: checkmarkPop 0.3s ease-out forwards;
   }
 }
