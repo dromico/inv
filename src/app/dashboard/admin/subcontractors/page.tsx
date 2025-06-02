@@ -231,6 +231,8 @@ export default function AdminSubcontractorsPage() {
 
       setIsDeleting(true)
 
+      console.log(`Attempting to delete subcontractor: ${deleteSubcontractor.company_name} (${deleteSubcontractor.id})`)
+
       const response = await fetch('/api/admin/subcontractors/delete', {
         method: 'POST',
         headers: {
@@ -242,9 +244,23 @@ export default function AdminSubcontractorsPage() {
       })
 
       const result = await response.json()
+      console.log('Delete API response:', result)
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to delete subcontractor')
+        // Provide more specific error messages based on status code
+        let errorMessage = result.message || 'Failed to delete subcontractor'
+
+        if (response.status === 401) {
+          errorMessage = 'Authentication required. Please log in again.'
+        } else if (response.status === 403) {
+          errorMessage = 'You do not have permission to delete subcontractors. Admin privileges required.'
+        } else if (response.status === 404) {
+          errorMessage = 'Subcontractor not found or has already been deleted.'
+        } else if (response.status === 500) {
+          errorMessage = `Server error: ${result.message}. ${result.note || ''}`
+        }
+
+        throw new Error(errorMessage)
       }
 
       toast({
@@ -252,13 +268,15 @@ export default function AdminSubcontractorsPage() {
         description: result.message || "The subcontractor account has been deleted successfully.",
       })
 
+      console.log(`Successfully deleted subcontractor: ${deleteSubcontractor.company_name}`)
+
       // Reload the subcontractors list
       loadSubcontractors()
     } catch (error) {
       console.error('Error deleting subcontractor:', error)
       toast({
         variant: "destructive",
-        title: "Error",
+        title: "Delete Failed",
         description: error instanceof Error ? error.message : "Failed to delete subcontractor. Please try again.",
       })
     } finally {
